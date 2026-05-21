@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Credit Trading Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Noto+Sans+Thai:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    
+    <style>
+        * {
+            font-family: 'Plus Jakarta Sans', 'Noto Sans Thai', -apple-system, BlinkMacSystemFont, sans-serif !important;
+        }
+    </style>
+</head>
+<body class="bg-slate-50/70 p-4 md:p-8 font-sans text-slate-800 antialiased min-h-screen"
+      x-data="dashboardApp()">
+
+    <div class="max-w-7xl mx-auto space-y-8">
+        
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-6 md:p-8 rounded-3xl shadow-sm border border-slate-100/80 transition-all">
+            <div>
+                <span class="text-blue-600 font-extrabold text-xs tracking-widest uppercase bg-blue-50 px-3 py-1 rounded-full border border-blue-100 shadow-sm inline-block mb-2">MANAGEMENT DESK</span>
+                <h1 class="text-2xl md:text-3xl font-extrabold text-slate-900 tracking-tight">Credit Trading Dashboard</h1>
+                <template x-if="fileName">
+                    <p class="text-sm text-slate-400 mt-2 flex items-center gap-2">
+                        <i data-lucide="file-text" class="text-blue-500 w-4 h-4"></i> Active Dataset: <span class="font-semibold text-slate-600" x-text="fileName"></span>
+                    </p>
+                </template>
+            </div>
+            
+            <div class="mt-4 md:mt-0 flex flex-col items-end">
+                <label class="cursor-pointer bg-slate-900 hover:bg-slate-800 hover:shadow-md hover:shadow-slate-200 text-white px-6 py-3 rounded-2xl transition duration-300 flex items-center gap-2 font-bold shadow-sm">
+                    <i data-lucide="upload" class="w-[18px] h-[18px]"></i>
+                    Upload Trade CSV
+                    <input type="file" accept=".csv" class="hidden" @change="handleFileUpload($event)">
+                </label>
+                <template x-if="error">
+                    <p class="text-rose-500 text-xs mt-2.5 flex items-center gap-1.5 font-semibold">
+                        <i data-lucide="alert-circle" class="w-3.5 h-3.5"></i> <span x-text="error"></span>
+                    </p>
+                </template>
+            </div>
+        </div>
+
+        <template x-if="data.length === 0">
+            <div class="bg-white rounded-3xl shadow-sm p-16 flex flex-col items-center justify-center text-center border border-slate-100 min-h-[420px]">
+                <div class="bg-blue-50/80 text-blue-500 p-6 rounded-full mb-6 border border-blue-100/50 shadow-sm">
+                    <i data-lucide="upload" class="w-12 h-12 stroke-[1.5]"></i>
+                </div>
+                <h2 class="text-xl font-bold text-slate-900 mb-2">No Data Available</h2>
+                <p class="text-slate-400 max-w-sm text-sm">Please upload a credit trade CSV file to populate metrics, breakdown cards, and rankings tables.</p>
+            </div>
+        </template>
+
+        <template x-if="data.length > 0">
+            <div class="space-y-8">
+                <div class="bg-white p-6 rounded-3xl shadow-sm flex flex-wrap items-center justify-between gap-6 border border-slate-100">
+                    <div class="flex flex-wrap items-center gap-6">
+                        <span class="text-xs font-extrabold text-slate-400 uppercase tracking-widest">GLOBAL TIMELINE FILTER:</span>
+                        <div class="flex items-center gap-3">
+                            <label class="text-xs font-extrabold text-slate-400 uppercase tracking-wider">Year</label>
+                            <select class="border border-slate-200 rounded-xl px-4 py-2 text-sm bg-slate-50/50 text-slate-700 font-bold outline-none cursor-pointer hover:border-slate-300 transition-colors"
+                                    x-model="selectedYear" @change="selectedMonth = 'All'">
+                                <option value="All">All Years</option>
+                                <template x-for="year in availableYears" :key="year">
+                                    <option :value="year" x-text="year"></option>
+                                </template>
+                            </select>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <label class="text-xs font-extrabold text-slate-400 uppercase tracking-wider">Month</label>
+                            <select class="border border-slate-200 rounded-xl px-4 py-2 text-sm bg-slate-50/50 text-slate-700 font-bold outline-none cursor-pointer hover:border-slate-300 transition-colors"
+                                    x-model="selectedMonth">
+                                <option value="All">All Months</option>
+                                <template x-for="month in availableMonths" :key="month">
+                                    <option :value="month" x-text="getMonthName(month)"></option>
+                                </template>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <template x-if="filteredData.length === 0">
+                    <div class="bg-white rounded-3xl shadow-sm p-16 text-center text-slate-400 font-medium">
+                        No trading data matches the selected filters.
+                    </div>
+                </template>
+
+                <template x-if="filteredData.length > 0">
+                    <div class="space-y-8">
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                            <div class="bg-white rounded-3xl p-6 shadow-sm flex items-center gap-5 border border-slate-100/80 transition-all duration-300 hover:shadow-md hover:shadow-slate-100">
+                                <div class="p-4 rounded-2xl border shadow-sm bg-blue-50 text-blue-600 border-blue-100">
+                                    <i data-lucide="trending-up" class="w-5 h-5 stroke-[2.5]"></i>
+                                </div>
+                                <div>
+                                    <p class="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">Total Transactions</p>
+                                    <h4 class="text-2xl font-extrabold text-slate-900 mt-1 tracking-tight">
+                                        <span x-text="kpis.totalTrades.toLocaleString()"></span> <span class="text-xs font-bold text-slate-400 ml-0.5">Trades</span>
+                                    </h4>
+                                </div>
+                            </div>
+                            <div class="bg-white rounded-3xl p-6 shadow-sm flex items-center gap-5 border border-slate-100/80 transition-all duration-300 hover:shadow-md hover:shadow-slate-100">
+                                <div class="p-4 rounded-2xl border shadow-sm bg-emerald-50 text-emerald-600 border-emerald-100">
+                                    <i data-lucide="package" class="w-5 h-5 stroke-[2.5]"></i>
+                                </div>
+                                <div>
+                                    <p class="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">Total Quantity</p>
+                                    <h4 class="text-2xl font-extrabold text-slate-900 mt-1 tracking-tight">
+                                        <span x-text="kpis.totalQuantity.toLocaleString(undefined, { maximumFractionDigits: 0 })"></span> <span class="text-xs font-bold text-slate-400 ml-0.5">Units</span>
+                                    </h4>
+                                </div>
+                            </div>
+                            <div class="bg-white rounded-3xl p-6 shadow-sm flex items-center gap-5 border border-slate-100/80 transition-all duration-300 hover:shadow-md hover:shadow-slate-100">
+                                <div class="p-4 rounded-2xl border shadow-sm bg-amber-50 text-amber-600 border-amber-100">
+                                    <i data-lucide="dollar-sign" class="w-5 h-5 stroke-[2.5]"></i>
+                                </div>
+                                <div>
+                                    <p class="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">Est. Total Value</p>
+                                    <h4 class="text-2xl font-extrabold text-slate-900 mt-1 tracking-tight" x-text="kpis.totalValue.toLocaleString(undefined, { maximumFractionDigits: 2 })"></h4>
+                                </div>
+                            </div>
+                            <div class="bg-white rounded-3xl p-6 shadow-sm flex items-center gap-5 border border-slate-100/80 transition-all duration-300 hover:shadow-md hover:shadow-slate-100">
+                                <div class="p-4 rounded-2xl border shadow-sm bg-violet-50 text-violet-600 border-violet-100">
+                                    <i data-lucide="trending-up" class="w-5 h-5 stroke-[2.5]"></i>
+                                </div>
+                                <div>
+                                    <p class="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">Avg. Unit Price</p>
+                                    <h4 class="text-2xl font-extrabold text-slate-900 mt-1 tracking-tight" x-text="kpis.avgPrice.toLocaleString(undefined, { maximumFractionDigits: 2 })"></h4>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="space-y-4">
+                            <div class="flex items-center gap-2">
+                                <i data-lucide="activity" class="text-blue-600 stroke-[2.5] w-5 h-5"></i>
+                                <h3 class="text-sm font-extrabold text-slate-900 uppercase tracking-wider">Credit Type Platform Breakdown</h3>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100/90 flex flex-col justify-between transition-all duration-300 hover:shadow-md relative overflow-hidden group">
+                                    <div class="absolute -top-16 -left-16 w-32 h-32 rounded-full filter blur-xl opacity-20 bg-gradient-to-br from-blue-500"></div>
+                                    <div class="relative z-10">
+                                        <div class="flex justify-between items-start mb-2">
+                                            <div>
+                                                <h4 class="text-lg font-bold text-slate-900 tracking-tight">IS-CSPO</h4>
+                                                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Platform Performance</p>
+                                            </div>
+                                            <span class="px-2.5 py-1 bg-slate-50 text-slate-500 rounded-full text-[10px] font-black font-mono tracking-wider shadow-sm border border-slate-100" x-text="(platformStats['IS-CSPO']?.totalTrades || 0) + ' TRADES'"></span>
+                                        </div>
+                                        <div class="h-52 relative my-2 flex justify-center">
+                                            <canvas id="cspoChart" x-init="$nextTick(() => renderDonut('cspoChart', platformStats['IS-CSPO'], ['#2563eb', '#93c5fd']))"></canvas>
+                                        </div>
+                                        <div class="flex justify-around text-xs font-bold mt-2 border-t pt-4 border-slate-100">
+                                            <div class="text-center flex flex-col items-center">
+                                                <span class="text-slate-400 flex items-center gap-1.5 justify-center text-[9px] uppercase tracking-wider mb-1 font-semibold">
+                                                    <span class="w-2 h-2 rounded-full inline-block" style="background-color: #2563eb"></span>On Platform
+                                                </span>
+                                                <span class="text-slate-800 font-mono text-sm font-bold" x-text="platformStats['IS-CSPO']?.onQty.toLocaleString() || '0'"></span>
+                                                <span class="text-slate-400 font-mono text-[10px] block font-semibold" x-text="'(' + getPercentage(platformStats['IS-CSPO']?.onQty, platformStats['IS-CSPO']?.totalQty) + '%)'"></span>
+                                                <span class="text-[9px] text-slate-400 block font-normal mt-0.5" x-text="(platformStats['IS-CSPO']?.onTrades || 0) + ' trades'"></span>
+                                            </div>
+                                            <div class="text-center border-l border-slate-100 pl-4 flex flex-col items-center">
+                                                <span class="text-slate-400 flex items-center gap-1.5 justify-center text-[9px] uppercase tracking-wider mb-1 font-semibold">
+                                                    <span class="w-2 h-2 rounded-full inline-block" style="background-color: #93c5fd"></span>Off Platform
+                                                </span>
+                                                <span class="text-slate-800 font-mono text-sm font-bold" x-text="platformStats['IS-CSPO']?.offQty.toLocaleString() || '0'"></span>
+                                                <span class="text-slate-400 font-mono text-[10px] block font-semibold" x-text="'(' + getPercentage(platformStats['IS-CSPO']?.offQty, platformStats['IS-CSPO']?.totalQty) + '%)'"></span>
+                                                <span class="text-[9px] text-slate-400 block font-normal mt-0.5" x-text="(platformStats['IS-CSPO']?.offTrades || 0) + ' trades'"></span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100/90 flex flex-col justify-between transition-all duration-300 hover:shadow-md relative overflow-hidden group">
+                                    <div class="absolute -top-16 -left-16 w-32 h-32 rounded-full filter blur-xl opacity-20 bg-gradient-to-br from-emerald-500"></div>
+                                    <div class="relative z-10">
+                                        <div class="flex justify-between items-start mb-2">
+                                            <div>
+                                                <h4 class="text-lg font-bold text-slate-900 tracking-tight">IS-CSPKO</h4>
+                                                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Platform Performance</p>
+                                            </div>
+                                            <span class="px-2.5 py-1 bg-slate-50 text-slate-500 rounded-full text-[10px] font-black font-mono tracking-wider shadow-sm border border-slate-100" x-text="(platformStats['IS-CSPKO']?.totalTrades || 0) + ' TRADES'"></span>
+                                        </div>
+                                        <div class="h-52 relative my-2 flex justify-center">
+                                            <canvas id="cspkoChart" x-init="$nextTick(() => renderDonut('cspkoChart', platformStats['IS-CSPKO'], ['#10b981', '#a7f3d0']))"></canvas>
+                                        </div>
+                                        <div class="flex justify-around text-xs font-bold mt-2 border-t pt-4 border-slate-100">
+                                            <div class="text-center flex flex-col items-center">
+                                                <span class="text-slate-400 flex items-center gap-1.5 justify-center text-[9px] uppercase tracking-wider mb-1 font-semibold">
+                                                    <span class="w-2 h-2 rounded-full inline-block" style="background-color: #10b981"></span>On Platform
+                                                </span>
+                                                <span class="text-slate-800 font-mono text-sm font-bold" x-text="platformStats['IS-CSPKO']?.onQty.toLocaleString() || '0'"></span>
+                                                <span class="text-slate-400 font-mono text-[10px] block font-semibold" x-text="'(' + getPercentage(platformStats['IS-CSPKO']?.onQty, platformStats['IS-CSPKO']?.totalQty) + '%)'"></span>
+                                                <span class="text-[9px] text-slate-400 block font-normal mt-0.5" x-text="(platformStats['IS-CSPKO']?.onTrades || 0) + ' trades'"></span>
+                                            </div>
+                                            <div class="text-center border-l border-slate-100 pl-4 flex flex-col items-center">
+                                                <span class="text-slate-400 flex items-center gap-1.5 justify-center text-[9px] uppercase tracking-wider mb-1 font-semibold">
+                                                    <span class="w-2 h-2 rounded-full inline-block" style="background-color: #a7f3d0"></span>Off Platform
+                                                </span>
+                                                <span class="text-slate-800 font-mono text-sm font-bold" x-text="platformStats['IS-CSPKO']?.offQty.toLocaleString() || '0'"></span>
+                                                <span class="text-slate-400 font-mono text-[10px] block font-semibold" x-text="'(' + getPercentage(platformStats['IS-CSPKO']?.offQty, platformStats['IS-CSPKO']?.totalQty) + '%)'"></span>
+                                                <span class="text-[9px] text-slate-400 block font-normal mt-0.5" x-text="(platformStats['IS-CSPKO']?.offTrades || 0) + ' trades'"></span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100/90 flex flex-col justify-between transition-all duration-300 hover:shadow-md relative overflow-hidden group">
+                                    <div class="absolute -top-16 -left-16 w-32 h-32 rounded-full filter blur-xl opacity-20 bg-gradient-to-br from-amber-500"></div>
+                                    <div class="relative z-10">
+                                        <div class="flex justify-between items-start mb-2">
+                                            <div>
+                                                <h4 class="text-lg font-bold text-slate-900 tracking-tight">IS-CSPKE</h4>
+                                                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Platform Performance</p>
+                                            </div>
+                                            <span class="px-2.5 py-1 bg-slate-50 text-slate-500 rounded-full text-[10px] font-black font-mono tracking-wider shadow-sm border border-slate-100" x-text="(platformStats['IS-CSPKE']?.totalTrades || 0) + ' TRADES'"></span>
+                                        </div>
+                                        <div class="h-52 relative my-2 flex justify-center">
+                                            <canvas id="cspkeChart" x-init="$nextTick(() => renderDonut('cspkeChart', platformStats['IS-CSPKE'], ['#f59e0b', '#fde68a']))"></canvas>
+                                        </div>
+                                        <div class="flex justify-around text-xs font-bold mt-2 border-t pt-4 border-slate-100">
+                                            <div class="text-center flex flex-col items-center">
+                                                <span class="text-slate-400 flex items-center gap-1.5 justify-center text-[9px] uppercase tracking-wider mb-1 font-semibold">
+                                                    <span class="w-2 h-2 rounded-full inline-block" style="background-color: #f59e0b"></span>On Platform
+                                                </span>
+                                                <span class="text-slate-800 font-mono text-sm font-bold" x-text="platformStats['IS-CSPKE']?.onQty.toLocaleString() || '0'"></span>
+                                                <span class="text-slate-400 font-mono text-[10px] block font-semibold" x-text="'(' + getPercentage(platformStats['IS-CSPKE']?.onQty, platformStats['IS-CSPKE']?.totalQty) + '%)'"></span>
+                                                <span class="text-[9px] text-slate-400 block font-normal mt-0.5" x-text="(platformStats['IS-CSPKE']?.onTrades || 0) + ' trades'"></span>
+                                            </div>
+                                            <div class="text-center border-l border-slate-100 pl-4 flex flex-col items-center">
+                                                <span class="text-slate-400 flex items-center gap-1.5 justify-center text-[9px] uppercase tracking-wider mb-1 font-semibold">
+                                                    <span class="w-2 h-2 rounded-full inline-block" style="background-color: #fde68a"></span>Off Platform
+                                                </span>
+                                                <span class="text-slate-800 font-mono text-sm font-bold" x-text="platformStats['IS-CSPKE']?.offQty.toLocaleString() || '0'"></span>
+                                                <span class="text-slate-400 font-mono text-[10px] block font-semibold" x-text="'(' + getPercentage(platformStats['IS-CSPKE']?.offQty, platformStats['IS-CSPKE']?.totalQty) + '%)'"></span>
+                                                <span class="text-[9px] text-slate-400 block font-normal mt-0.5" x-text="(platformStats['IS-CSPKE']?.offTrades || 0) + ' trades'"></span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-white p-6 md:p-8 rounded-3xl shadow-sm border border-slate-100">
+                            <h3 class="text-sm font-extrabold text-slate-900 uppercase tracking-widest mb-6 border-b pb-4 border-slate-50">Quantity Distribution by Credit Type</h3>
+                            <div class="h-80 relative flex justify-center">
+                                <canvas id="creditTypePieChart"></canvas>
+                            </div>
+                        </div>
+
+                        <div class="bg-white p-6 md:p-8 rounded-3xl shadow-sm border border-slate-100">
+                            <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4 border-b pb-4 border-slate-50">
+                                <h3 class="text-sm font-extrabold text-slate-900 uppercase tracking-widest flex-1"
+                                    x-text="topListType === 'seller' ? 'Top 10 Sellers (by Quantity)' : 'Top 10 Buyers (by Quantity)'">
+                                </h3>
+                                
+                                <div class="flex flex-wrap items-center gap-4">
+                                    <div class="flex items-center gap-2">
+                                        <label class="text-xs font-extrabold text-slate-400 uppercase tracking-wider">Category</label>
+                                        <select class="border border-slate-200 rounded-xl px-3 py-1.5 text-xs bg-slate-50 text-slate-700 font-bold outline-none hover:border-slate-300 transition-colors cursor-pointer"
+                                                x-model="selectedTopListCreditType">
+                                            <option value="All">All Credit Types</option>
+                                            <template x-for="type in uniqueCreditTypes" :key="type">
+                                                <option :value="type" x-text="type"></option>
+                                            </template>
+                                        </select>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <label class="text-xs font-extrabold text-slate-400 uppercase tracking-wider">View</label>
+                                        <select class="border border-slate-200 rounded-xl px-3 py-1.5 text-xs bg-slate-50 text-slate-700 font-bold outline-none hover:border-slate-300 transition-colors cursor-pointer"
+                                                x-model="topListType">
+                                            <option value="seller">Sellers</option>
+                                            <option value="buyer">Buyers</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="h-[420px] relative">
+                                <canvas id="topTenBarChart"></canvas>
+                            </div>
+                        </div>
+
+                        <div class="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
+                            <div class="p-6 border-b border-slate-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-slate-50/50">
+                                <div class="flex items-center gap-3">
+                                    <div class="p-3 bg-slate-900 text-white rounded-2xl shadow-sm">
+                                        <i data-lucide="users" class="w-5 h-5 stroke-[2.5]"></i>
+                                    </div>
+                                    <div>
+                                        <h3 class="text-lg font-bold text-slate-900 tracking-tight"
+                                            x-text="topListType === 'buyer' ? 'Buyer Summary Table' : 'Seller Summary Table'">
+                                        </h3>
+                                        <p class="text-xs text-slate-400 font-semibold mt-0.5">
+                                            Ranked by Total Volume | Dynamic syncing with Category filter
+                                        </p>
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-2 text-xs font-bold px-3.5 py-1.5 bg-white border border-slate-100 rounded-full shadow-sm">
+                                    <i data-lucide="layers" class="text-blue-500 w-3.5 h-3.5"></i>
+                                    Category: <span class="text-blue-600 uppercase font-black" x-text="selectedTopListCreditType"></span>
+                                </div>
+                            </div>
+                            
+                            <div class="overflow-x-auto">
+                                <table class="min-w-full divide-y divide-slate-100 border-collapse">
+                                    <thead class="bg-slate-50/50">
+                                        <tr>
+                                            <th class="px-6 py-4 text-left text-[10px] font-extrabold text-slate-400 uppercase tracking-widest border-b border-slate-100">Rank</th>
+                                            <th class="px-6 py-4 text-left text-[10px] font-extrabold text-slate-400 uppercase tracking-widest border-b border-slate-100">Trading Account</th>
+                                            <th class="px-6 py-4 text-left text-[10px] font-extrabold text-slate-400 uppercase tracking-widest border-b border-slate-100"
+                                                x-text="topListType === 'buyer' ? 'Buyer Name' : 'Seller Name'">
+                                            </th>
+                                            <th class="px-6 py-4 text-right text-[10px] font-extrabold text-slate-400 uppercase tracking-widest border-b border-slate-100">Total Credits (Units)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="bg-white divide-y divide-slate-100">
+                                        <template x-if="tradingTableData.length > 0">
+                                            <template x-for="(entity, idx) in tradingTableData" :key="idx">
+                                                <tr :class="idx < 10 ? 'bg-blue-50/10 hover:bg-slate-50/50' : 'hover:bg-slate-50/50 transition-colors duration-200'">
+                                                    <td class="px-6 py-4 whitespace-nowrap text-xs font-bold text-slate-600">
+                                                        <template x-if="idx < 3">
+                                                            <span :class="'px-2.5 py-1 rounded-full text-[10px] font-black tracking-wider border shadow-sm flex items-center gap-1.5 w-fit ' + 
+                                                                (idx === 0 ? 'bg-amber-100 text-amber-800 border-amber-200' : 
+                                                                 idx === 1 ? 'bg-slate-100 text-slate-700 border-slate-200' : 
+                                                                 'bg-orange-100 text-orange-800 border-orange-200')">
+                                                                <i data-lucide="award" class="w-3 h-3 stroke-[2.5]"></i>
+                                                                TOP <span x-text="idx + 1"></span>
+                                                            </span>
+                                                        </template>
+                                                        <template x-if="idx >= 3 && idx < 10">
+                                                            <span class="px-2.5 py-1 rounded-full text-[10px] bg-blue-50 text-blue-700 font-black tracking-wider border border-blue-100/50 inline-block">
+                                                                TOP <span x-text="idx + 1"></span>
+                                                            </span>
+                                                        </template>
+                                                        <template x-if="idx >= 10">
+                                                            <span class="text-slate-400 pl-3 font-semibold" x-text="'#' + (idx + 1)"></span>
+                                                        </template>
+                                                    </td>
+                                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-mono text-slate-500 font-semibold" 
+                                                        x-text="getTradingAccount(entity.representativeRow, topListType)">
+                                                    </td>
+                                                    <td class="px-6 py-4 whitespace-nowrap">
+                                                        <div class="text-sm font-bold text-slate-800 tracking-tight" x-text="entity.name"></div>
+                                                    </td>
+                                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-right font-black text-blue-600 font-mono tracking-tight"
+                                                        x-text="entity.totalCredits.toLocaleString(undefined, { maximumFractionDigits: 0 })">
+                                                    </td>
+                                                </tr>
+                                            </template>
+                                        </template>
+                                        <template x-if="tradingTableData.length === 0">
+                                            <tr>
+                                                <td colSpan="4" class="px-6 py-20 text-center text-slate-400 italic text-sm">
+                                                    No records found matching the current criteria.
+                                                </td>
+                                            </tr>
+                                        </template>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <template x-if="tradingTableData.length > 0">
+                                <div class="p-4 bg-slate-50/50 border-t border-slate-100 text-[11px] text-slate-400 font-bold uppercase tracking-wider text-center">
+                                    Showing all <span x-text="tradingTableData.length"></span> active <span x-text="topListType"></span>s for Category: <strong x-text="selectedTopListCreditType"></strong>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </template>
+    </div>
+
+    <script>
+        // --- Custom Helpers ---
+        const hashCode = (str) => {
+            let hash = 0;
+            for (let i = 0; i < str.length; i++) {
+                hash = str.charCodeAt(i) + ((hash << 5) - hash);
+            }
+            return Math.abs(hash) % 100000;
+        };
+
+        const getTradingAccount = (row, type = 'buyer') => {
+            if (!row) return 'N/A';
+            const keys = Object.keys(row);
+            const accountKey = keys.find(k => {
+                const l = k.toLowerCase();
+                return l.includes(`${type}_account`) || l.includes('account') || l.includes('member') || l.includes('id');
+            });
+            if (accountKey && row[accountKey]) return row[accountKey];
+            
+            const entityName = type === 'buyer' ? row.buyer : row.seller;
+            if (!entityName) return 'N/A';
+            return `ACT-${hashCode(entityName)}`;
+        };
+
+        const parseCSV = (csvText) => {
+            const objPattern = new RegExp(("(\\,|\\r?\\n|\\r|^)" + "(?:\"([^\"]*(?:\"\"[^\"]*)*)\"|" + "([^\"\\,\\r\\n]*))"), "gi");
+            let arrData = [[]];
+            let arrMatches = null;
+            while ((arrMatches = objPattern.exec(csvText))) {
+                const strMatchedDelimiter = arrMatches[1];
+                if (strMatchedDelimiter.length && strMatchedDelimiter !== ",") {
+                    arrData.push([]);
+                }
+                let strMatchedValue = arrMatches[2] ? arrMatches[2].replace(new RegExp("\"\"", "g"), "\"") : arrMatches[3];
+                arrData[arrData.length - 1].push(strMatchedValue);
+            }
+            const headers = arrData[0].map(h => h ? h.trim() : '');
+            const result = [];
+            for (let i = 1; i < arrData.length; i++) {
+                if (arrData[i].length === 1 && arrData[i][0] === "") continue;
+                const obj = {};
+                for (let j = 0; j < headers.length; j++) {
+                    let val = arrData[i][j] ? arrData[i][j].trim() : "";
+                    if (headers[j] === 'quantity' || headers[j] === 'unit_price') {
+                        val = parseFloat(val);
+                        if (isNaN(val)) val = 0;
+                    }
+                    obj[headers[j]] = val;
+                }
+                if (obj['trade_date_time'] || obj['seller']) {
+                    if (obj['trade_date_time']) {
+                        const dateStr = obj['trade_date_time'].split(' ')[0];
+                        const parts = dateStr.split('-');
+                        if (parts.length >= 2) {
+                            obj.year = parts[0];
+                            obj.month = parts[1];
+                        }
+                    }
+                    result.push(obj);
+                }
+            }
+            return result;
+        };
+
+        // --- Alpine Application Engine ---
+        function dashboardApp() {
+            return {
+                data: [],
+                fileName: '',
+                error: '',
+                selectedYear: 'All',
+                selectedMonth: 'All',
+                topListType: 'buyer',
+                selectedTopListCreditType: 'All',
+                COLORS: ['#2563eb', '#10b981', '#f59e0b', '#f43f5e', '#8b5cf6', '#06b6d4'],
+                
+                // Chart instances for management
+                charts: {},
+
+                init() {
+                    // Update Lucide vectors whenever structural shifts take place
+                    this.$watch('data', () => this.refreshDomSideEffects());
+                    this.$watch('selectedYear', () => this.refreshDomSideEffects());
+                    this.$watch('selectedMonth', () => this.refreshDomSideEffects());
+                    this.$watch('topListType', () => this.refreshDomSideEffects());
+                    this.$watch('selectedTopListCreditType', () => this.refreshDomSideEffects());
+                },
+
+                refreshDomSideEffects() {
+                    this.$nextTick(() => {
+                        lucide.createIcons();
+                        this.renderComplexCharts();
+                    });
+                },
+
+                handleFileUpload(e) {
+                    const file = e.target.files[0];
+                    if (!file) return;
+                    if (!file.name.endsWith('.csv')) {
+                        this.error = 'Please upload a .csv file only.';
+                        return;
+                    }
+                    this.fileName = file.name;
+                    this.error = '';
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                        try {
+                            const text = event.target.result;
+                            const parsedData = parseCSV(text);
+                            if (parsedData.length === 0) {
+                                this.error = 'No data found or invalid file format.';
+                            } else {
+                                this.data = parsedData;
+                                this.selectedYear = 'All';
+                                this.selectedMonth = 'All';
+                                this.selectedTopListCreditType = 'All';
+                            }
+                        } catch (err) {
+                            this.error = 'Error reading file: ' + err.message;
+                        }
+                    };
+                    reader.readAsText(file);
+                },
+
+                // Getters mirroring useMemo hooks
+                get filteredData() {
+                    return this.data.filter(row => {
+                        const matchYear = this.selectedYear === 'All' || row.year === this.selectedYear;
+                        const matchMonth = this.selectedMonth === 'All' || row.month === this.selectedMonth;
+                        return matchYear && matchMonth;
+                    });
+                },
+
+                get platformStats() {
+                    const stats = {
+                        'IS-CSPO': { onQty: 0, offQty: 0, onTrades: 0, offTrades: 0, totalQty: 0, totalTrades: 0 },
+                        'IS-CSPKO': { onQty: 0, offQty: 0, onTrades: 0, offTrades: 0, totalQty: 0, totalTrades: 0 },
+                        'IS-CSPKE': { onQty: 0, offQty: 0, onTrades: 0, offTrades: 0, totalQty: 0, totalTrades: 0 },
+                    };
+                    this.filteredData.forEach(row => {
+                        const creditType = (row['credit type'] || '').trim().toUpperCase();
+                        const tradeType = (row['Trade Type'] || '').trim().toLowerCase();
+                        const qty = Number(row.quantity) || 0;
+                        let key = null;
+                        if (creditType.includes('IS-CSPO')) key = 'IS-CSPO';
+                        else if (creditType.includes('IS-CSPKO')) key = 'IS-CSPKO';
+                        else if (creditType.includes('IS-CSPKE')) key = 'IS-CSPKE';
+                        
+                        if (key) {
+                            const isOff = tradeType.includes('off') || tradeType.includes('out') || tradeType.includes('direct');
+                            if (isOff) {
+                                stats[key].offQty += qty;
+                                stats[key].offTrades += 1;
+                            } else {
+                                stats[key].onQty += qty;
+                                stats[key].onTrades += 1;
+                            }
+                            stats[key].totalQty += qty;
+                            stats[key].totalTrades += 1;
+                        }
+                    });
+                    return stats;
+                },
+
+                get tradingTableData() {
+                    const agg = {};
+                    this.filteredData.forEach(row => {
+                        const entity = this.topListType === 'buyer' ? (row.buyer || 'Unknown') : (row.seller || 'Unknown');
+                        const type = row['credit type'] || 'Unknown';
+                        const qty = Number(row.quantity) || 0;
+                        if (this.selectedTopListCreditType !== 'All' && type !== this.selectedTopListCreditType) return;
+                        if (!agg[entity]) {
+                            agg[entity] = { name: entity, totalCredits: 0, representativeRow: row };
+                        }
+                        agg[entity].totalCredits += qty;
+                    });
+                    return Object.values(agg).sort((a, b) => b.totalCredits - a.totalCredits);
+                },
+
+                get kpis() {
+                    let totalQuantity = 0;
+                    let totalValue = 0;
+                    this.filteredData.forEach(row => {
+                        const q = Number(row.quantity) || 0;
+                        const p = Number(row.unit_price) || 0;
+                        totalQuantity += q;
+                        totalValue += (q * p);
+                    });
+                    return {
+                        totalTrades: this.filteredData.length,
+                        totalQuantity: totalQuantity,
+                        totalValue: totalValue,
+                        avgPrice: totalQuantity > 0 ? (totalValue / totalQuantity) : 0
+                    };
+                },
+
+                get creditTypeData() {
+                    const agg = {};
+                    this.filteredData.forEach(row => {
+                        const type = row['credit type'] || 'Unknown';
+                        agg[type] = (agg[type] || 0) + (Number(row.quantity) || 0);
+                    });
+                    return Object.keys(agg).map(key => ({ name: key, value: agg[key] })).sort((a,b) => b.value - a.value);
+                },
+
+                get topBuyers() {
+                    const agg = {};
+                    this.filteredData.forEach(row => {
+                        const buyer = row.buyer || 'Unknown';
+                        const type = row['credit type'] || 'Unknown';
+                        const qty = Number(row.quantity) || 0;
+                        if (this.selectedTopListCreditType !== 'All' && type !== this.selectedTopListCreditType) return;
+                        agg[buyer] = (agg[buyer] || 0) + qty;
+                    });
+                    return Object.keys(agg)
+                        .map(key => ({ name: key, displayName: key.length > 20 ? key.substring(0, 20) + '...' : key, quantity: Math.round(agg[key]) }))
+                        .sort((a, b) => b.quantity - a.quantity).slice(0, 10);
+                },
+
+                get topSellers() {
+                    const agg = {};
+                    this.filteredData.forEach(row => {
+                        const seller = row.seller || 'Unknown';
+                        const type = row['credit type'] || 'Unknown';
+                        const qty = Number(row.quantity) || 0;
+                        if (this.selectedTopListCreditType !== 'All' && type !== this.selectedTopListCreditType) return;
+                        agg[seller] = (agg[seller] || 0) + qty;
+                    });
+                    return Object.keys(agg)
+                        .map(key => ({ name: key, displayName: key.length > 20 ? key.substring(0, 20) + '...' : key, quantity: Math.round(agg[key]) }))
+                        .sort((a, b) => b.quantity - a.quantity).slice(0, 10);
+                },
+
+                get availableYears() {
+                    const years = new Set(this.data.map(d => d.year).filter(Boolean));
+                    return Array.from(years).sort().reverse();
+                },
+
+                get availableMonths() {
+                    const filteredForMonth = this.selectedYear !== 'All' ? this.data.filter(d => d.year === this.selectedYear) : this.data;
+                    const months = new Set(filteredForMonth.map(d => d.month).filter(Boolean));
+                    return Array.from(months).sort();
+                },
+
+                get uniqueCreditTypes() {
+                    const types = new Set(this.data.map(d => d['credit type'] || 'Unknown'));
+                    return Array.from(types).sort();
+                },
+
+                getMonthName(monthNum) {
+                    const names = {
+                        '01':'January', '02':'February', '03':'March', '04':'April', '05':'May', '06':'June', 
+                        '07':'July', '08':'August', '09':'September', '10':'October', '11':'November', '12':'December'
+                    };
+                    return names[monthNum] || monthNum;
+                },
+
+                getPercentage(val, total) {
+                    if (!total) return '0.0';
+                    return ((val / total) * 100).toFixed(1);
+                },
+
+                getTradingAccount(row, type) {
+                    return getTradingAccount(row, type);
+                },
+
+                // --- Canvas Chart Rendering Engines ---
+                renderDonut(canvasId, stats, colors) {
+                    if (this.charts[canvasId]) this.charts[canvasId].destroy();
+                    
+                    const isEmpty = !stats || stats.totalQty === 0;
+                    const ctx = document.getElementById(canvasId).getContext('2d');
+                    
+                    const dataValues = isEmpty ? [1] : [stats.onQty, stats.offQty];
+                    const bgColors = isEmpty ? ['#f1f5f9'] : colors;
+
+                    this.charts[canvasId] = new Chart(ctx, {
+                        type: 'doughnut',
+                        data: {
+                            datasets: [{
+                                data: dataValues,
+                                backgroundColor: bgColors,
+                                borderWidth: isEmpty ? 0 : 2,
+                                borderColor: '#ffffff'
+                            }]
+                        },
+                        options: {
+                            cutout: '70%',
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                tooltip: {
+                                    enabled: !isEmpty,
+                                    callbacks: {
+                                        label: function(context) {
+                                            return ` ${context.dataset.data[context.dataIndex].toLocaleString()} credits`;
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        plugins: [{
+                            id: 'centerText',
+                            beforeDraw(chart) {
+                                const { width, height, ctx } = chart;
+                                ctx.restore();
+                                ctx.textBaseline = "middle";
+
+                                ctx.font = "800 9px sans-serif";
+                                ctx.fillStyle = "#94a3b8";
+                                const text1 = "TOTAL VOLUME",
+                                      text1X = Math.round((width - ctx.measureText(text1).width) / 2),
+                                      text1Y = height / 2 - 12;
+                                ctx.fillText(text1, text1X, text1Y);
+
+                                ctx.font = "800 16px sans-serif";
+                                ctx.fillStyle = "#0f172a";
+                                const text2 = isEmpty ? "0" : (stats.totalQty).toLocaleString(undefined, { maximumFractionDigits: 0 }),
+                                      text2X = Math.round((width - ctx.measureText(text2).width) / 2),
+                                      text2Y = height / 2 + 6;
+                                ctx.fillText(text2, text2X, text2Y);
+                                ctx.save();
+                            }
+                        }]
+                    });
+                },
+
+                renderComplexCharts() {
+                    if (this.filteredData.length === 0) return;
+
+                    // 1. Credit Type Pie Chart
+                    if (this.charts['creditTypePieChart']) this.charts['creditTypePieChart'].destroy();
+                    const pieCtx = document.getElementById('creditTypePieChart').getContext('2d');
+                    const pieData = this.creditTypeData;
+                    
+                    this.charts['creditTypePieChart'] = new Chart(pieCtx, {
+                        type: 'doughnut',
+                        data: {
+                            labels: pieData.map(d => d.name),
+                            datasets: [{
+                                data: pieData.map(d => d.value),
+                                backgroundColor: this.COLORS,
+                                borderWidth: 3
+                            }]
+                        },
+                        options: {
+                            cutout: '65%',
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { position: 'bottom', labels: { boxWidth: 12, font: { weight: 600 } } }
+                            }
+                        }
+                    });
+
+                    // 2. Dynamic Rank Vertical Bar Chart
+                    if (this.charts['topTenBarChart']) this.charts['topTenBarChart'].destroy();
+                    const barCtx = document.getElementById('topTenBarChart').getContext('2d');
+                    const barData = this.topListType === 'seller' ? this.topSellers : this.topBuyers;
+                    
+                    this.charts['topTenBarChart'] = new Chart(barCtx, {
+                        type: 'bar',
+                        data: {
+                            labels: barData.map(d => d.displayName),
+                            datasets: [{
+                                label: 'Quantity',
+                                data: barData.map(d => d.quantity),
+                                backgroundColor: this.topListType === 'seller' ? '#2563eb' : '#8b5cf6',
+                                borderRadius: 6
+                            }]
+                        },
+                        options: {
+                            indexAxis: 'y',
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: { legend: { display: false } },
+                            scales: {
+                                x: { grid: { display: false }, ticks: { font: { size: 10 } } },
+                                y: { grid: { display: false }, ticks: { font: { size: 11, weight: 600 } } }
+                            }
+                        }
+                    });
+                }
+            }
+        }
+    </script>
+</body>
+</html>
