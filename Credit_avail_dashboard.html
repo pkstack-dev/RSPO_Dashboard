@@ -296,18 +296,17 @@
                 activeData: [],
                 allMonthsData: {},
                 lastUpdated: null,
-                selectedSheetGid: '1984081462', // May 2026 initial selection
+                selectedSheetGid: '1984081462', // ตั้งค่าเริ่มต้นโหลดเดือนล่าสุด May 2026 อัตโนมัติ
                 isLoading: false,
                 isExporting: false,
                 error: null,
                 charts: {},
 
                 init() {
-                    // Fetch data on init
+                    // โหลดข้อมูลเดือน May 2026 เป็น Default แรกเริ่ม
                     this.fetchData(this.selectedSheetGid);
                 },
 
-                // Get label from current selected GID
                 getSelectedSheetLabel() {
                     const match = this.MONTHS_CONFIG.find(m => m.gid === this.selectedSheetGid);
                     return match ? match.label : '';
@@ -375,7 +374,6 @@
                             console.error(`Error loading history`, e);
                         }
                     }
-                    // Re-render trends graph on updating state
                     this.$nextTick(() => this.renderHistoricalTrendCharts());
                 },
 
@@ -391,7 +389,6 @@
                         this.activeData = this.parseCSVData(text);
                         this.lastUpdated = new Date().toLocaleTimeString();
                         
-                        // Sync UI vectors & run historical pull
                         this.$nextTick(() => {
                             lucide.createIcons();
                             this.renderActiveRiskCharts();
@@ -440,7 +437,6 @@
                     this.isExporting = false;
                 },
 
-                // Global Stats Computed Object
                 get activeStats() {
                     return {
                         ffb: this.activeData.reduce((acc, curr) => acc + (curr['FFB Balance'] || 0), 0),
@@ -479,7 +475,6 @@
                     return Object.values(aggregated).sort((a, b) => b.ffb - a.ffb);
                 },
 
-                // Historical helper calculations
                 getTrendCountries(type, riskLabel) {
                     const countrySet = new Set();
                     this.MONTHS_CONFIG.forEach(m => {
@@ -509,7 +504,7 @@
                     return Math.round(sum).toLocaleString();
                 },
 
-                // --- ปรับปรุง Chart.js Rendering Logic ให้เหมือน Recharts ต้นฉบับ ---
+                // --- ปรับแต่งระบบเรนเดอร์กราฟให้ถอดดีไซน์มาจาก Recharts ต้นฉบับ ---
                 renderActiveRiskCharts() {
                     this.RISK_CONFIG.forEach(risk => {
                         const chartData = this.getRiskAggregatedData(risk.label);
@@ -528,22 +523,22 @@
                                         type: 'bar',
                                         label: 'FFB Balance',
                                         data: chartData.map(d => d.ffb),
-                                        backgroundColor: '#64748b', // สี Slate เดิม 
+                                        backgroundColor: '#64748b',
                                         yAxisID: 'yLeft',
-                                        barPercentage: 0.25, // ทำให้แท่งผอมลง มินิมอลแบบต้นฉบับ
-                                        maxBarThickness: 34, // ล็อคความหนาแท่งสูงสุด 
-                                        borderRadius: { topLeft: 4, topRight: 4, bottomLeft: 0, bottomRight: 0 } // มนเฉพาะปลายบน 
+                                        barPercentage: 0.25, // บีบให้ขนาดแท่งผอมลง มินิมอลเหมือนต้นฉบับ
+                                        maxBarThickness: 34,
+                                        borderRadius: { topLeft: 4, topRight: 4, bottomLeft: 0, bottomRight: 0 } // ปลายมนเฉพาะด้านบน
                                     },
                                     {
                                         type: 'line',
                                         label: 'Available IS-CSPO',
                                         data: chartData.map(d => d.cspo),
                                         borderColor: '#2563eb',
-                                        backgroundColor: '#ffffff', // พื้นจุดสีขาวตัดขอบ 
-                                        borderWidth: 2, // เส้นหนา 2px กำลังสวย 
+                                        backgroundColor: '#ffffff', // พื้นจุดขาวตัดขอบ
+                                        borderWidth: 2,
                                         yAxisID: 'yRight',
-                                        tension: 0.2, // มีความโค้งมนเล็กน้อยแบบธรรมชาติ
-                                        pointRadius: 3, // จุดขนาดเล็ก 
+                                        tension: 0.2, // เพิ่มความสมูทโค้งมนเล็กน้อยแบบ Recharts
+                                        pointRadius: 3, // ขนาดจุดเล็กลงคลีนๆ
                                         pointHoverRadius: 5,
                                         pointBorderColor: '#2563eb',
                                         pointBorderWidth: 1.5
@@ -553,11 +548,11 @@
                                         label: 'Available IS-CSPKO',
                                         data: chartData.map(d => d.cspko),
                                         borderColor: '#f59e0b',
-                                        backgroundColor: '#ffffff', [cite: 195]
-                                        borderWidth: 2, [cite: 195]
+                                        backgroundColor: '#ffffff',
+                                        borderWidth: 2,
                                         yAxisID: 'yRight',
                                         tension: 0.2,
-                                        pointRadius: 3, [cite: 195]
+                                        pointRadius: 3,
                                         pointHoverRadius: 5,
                                         pointBorderColor: '#f59e0b',
                                         pointBorderWidth: 1.5
@@ -567,11 +562,11 @@
                                         label: 'Available IS-CSPKE',
                                         data: chartData.map(d => d.cspke),
                                         borderColor: '#dc2626',
-                                        backgroundColor: '#ffffff', [cite: 195]
-                                        borderWidth: 2, [cite: 195]
+                                        backgroundColor: '#ffffff',
+                                        borderWidth: 2,
                                         yAxisID: 'yRight',
                                         tension: 0.2,
-                                        pointRadius: 3, [cite: 195]
+                                        pointRadius: 3,
                                         pointHoverRadius: 5,
                                         pointBorderColor: '#dc2626',
                                         pointBorderWidth: 1.5
@@ -586,7 +581,7 @@
                                         position: 'top', 
                                         align: 'end', 
                                         labels: { 
-                                            boxWidth: 6, // เปลี่ยนเป็นจุดวงกลมเล็กๆ แทนกล่องสี่เหลี่ยมหนาๆ 
+                                            boxWidth: 6, // เปลี่ยนจากสี่เหลี่ยมทึบหนาๆ เป็นจุดวงกลมเล็กสไตล์คลีน
                                             usePointStyle: true, 
                                             pointStyle: 'circle',
                                             font: { size: 9, weight: 600, family: "'Inter', sans-serif" },
@@ -595,15 +590,15 @@
                                         } 
                                     },
                                     tooltip: {
-                                        backgroundColor: '#ffffff', // พื้นหลังขาวตามดีไซน์ Recharts [cite: 193]
+                                        backgroundColor: '#ffffff', // พื้นหลังขาวตามดีไซน์ Recharts
                                         titleColor: '#0f172a',
                                         bodyColor: '#475569',
-                                        borderColor: '#e2e8f0', // ขอบจางๆ 
+                                        borderColor: '#e2e8f0',
                                         borderWidth: 1,
-                                        borderRadius: 10, // ความโค้งมน 10px [cite: 193]
-                                        padding: 8, [cite: 194]
+                                        borderRadius: 10, // ความมนขอบกล่องข้อความ
+                                        padding: 8,
                                         titleFont: { size: 10, weight: 700 },
-                                        bodyFont: { size: 10, weight: 600 }, [cite: 194]
+                                        bodyFont: { size: 10, weight: 600 },
                                         boxWidth: 6,
                                         boxPadding: 4,
                                         usePointStyle: true,
@@ -614,26 +609,26 @@
                                 },
                                 scales: {
                                     x: { 
-                                        grid: { display: false }, // ซ่อนเส้นกริดแนวตั้ง 
-                                        border: { display: false }, // ซ่อนเส้นขอบแกนฐาน 
-                                        ticks: { font: { size: 10, weight: 600 }, color: '#475569' } [cite: 192]
+                                        grid: { display: false }, // ซ่อนเส้นตารางแกนแนวตั้งทั้งหมด
+                                        border: { display: false },
+                                        ticks: { font: { size: 10, weight: 600 }, color: '#475569' }
                                     },
                                     yLeft: { 
                                         position: 'left', 
-                                        border: { display: false }, // ซ่อนเส้นขอบแกนซ้าย [cite: 193]
-                                        grid: { color: '#f1f5f9', drawTicks: false }, // เส้นกริดแนวนอนแบบบางมาก 
+                                        border: { display: false },
+                                        grid: { color: '#f1f5f9', drawTicks: false }, // แบ็คกราวน์สเกลแนวนอนสีจางสุดๆ
                                         ticks: { 
-                                            font: { size: 9, weight: 500 }, [cite: 193]
+                                            font: { size: 9, weight: 500 },
                                             color: '#475569',
                                             callback: function(value) { return value.toLocaleString(); }
                                         } 
                                     },
                                     yRight: { 
                                         position: 'right', 
-                                        border: { display: false }, // ซ่อนเส้นขอบแกนขวา [cite: 193]
-                                        grid: { display: false }, // ไม่ซ้อนเส้นกริดซ้ำซ้อน [cite: 193]
+                                        border: { display: false },
+                                        grid: { display: false }, // ซ่อน grid ฝั่งขวาไม่ให้ตีกันมั่ว
                                         ticks: { 
-                                            font: { size: 9, weight: 500 }, [cite: 193]
+                                            font: { size: 9, weight: 500 },
                                             color: '#475569',
                                             callback: function(value) { return value.toLocaleString(); }
                                         } 
@@ -653,7 +648,6 @@
 
                             if (this.charts[canvasId]) this.charts[canvasId].destroy();
 
-                            // Aggregate totals array across months config mapping
                             const seriesData = this.MONTHS_CONFIG.map(m => {
                                 const mData = this.allMonthsData[m.label] || [];
                                 const total = mData
