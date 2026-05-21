@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ISH Intelligence Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
+    <style>
+        body { 
+            font-family: 'Inter', sans-serif; 
+            font-weight: 600; 
+            background-color: #f8fafc;
+            -webkit-font-smoothing: antialiased; 
+        } 
+        h1, h2, h3, h4, .text-primary-dark {
+            color: #0f172a !important; 
+        }
+        .text-white { color: #fff !important; }
+    </style>
+</head>
+<body class="min-h-screen bg-[#f8fafc] p-4 md:p-6 text-slate-800 antialiased" x-data="ishApp()">
+
+    <div x-show="isLoading || isExporting" class="fixed inset-0 bg-white/95 z-[100] flex flex-col items-center justify-center backdrop-blur-sm" style="display: none;">
+        <i data-lucide="activity" class="text-slate-900 mb-3 animate-bounce w-8 h-8"></i>
+        <span class="font-bold text-xs uppercase tracking-widest text-slate-800" x-text="isLoading ? 'SYNCING DATA...' : 'EXPORTING PNG...'"></span>
+    </div>
+
+    <div class="max-w-7xl mx-auto">
+        <header class="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4 border-b-2 pb-4 border-slate-200">
+            <div>
+                <h1 class="text-xl md:text-2xl font-bold tracking-tight uppercase leading-none mb-1 text-slate-900">ISH Intelligence Dashboard</h1>
+                <div class="flex items-center gap-3 text-slate-500">
+                    <span class="text-[9px] font-semibold bg-slate-900 text-white px-2 py-0.5 rounded uppercase">Live Feed</span>
+                    <template x-if="lastUpdated">
+                        <span class="text-[9px] font-medium uppercase text-slate-400 italic" x-text="'Sync: ' + lastUpdated"></span>
+                    </template>
+                </div>
+            </div>
+            <div class="flex flex-wrap items-center gap-3">
+                <label class="flex items-center gap-2 bg-white border border-slate-200 text-slate-700 px-4 py-1.5 rounded-xl cursor-pointer hover:bg-slate-50 shadow-sm active:translate-y-[1px] transition-all">
+                    <i data-lucide="upload" class="w-3.5 h-3.5"></i>
+                    <span class="font-semibold text-xs uppercase">CSV</span>
+                    <input type="file" accept=".csv" @change="handleManualUpload($event)" class="hidden" />
+                </label>
+                <div class="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-4 py-1.5 shadow-sm">
+                    <i data-lucide="calendar" class="text-slate-400 w-3.5 h-3.5"></i>
+                    <select x-model="selectedSheetGid" @change="changeSheet()" class="bg-transparent text-xs font-semibold uppercase focus:outline-none cursor-pointer text-slate-800">
+                        <template x-for="m in MONTHS_CONFIG" :key="m.gid">
+                            <option :value="m.gid" x-text="m.label.toUpperCase()"></option>
+                        </template>
+                    </select>
+                </div>
+                <button @click="fetchData(selectedSheetGid)" class="bg-slate-900 text-white p-2 rounded-xl shadow-sm hover:bg-slate-800 transition-colors">
+                    <i data-lucide="refresh-cw" class="w-3.5 h-3.5 text-white"></i>
+                </button>
+            </div>
+        </header>
+
+        <template x-if="error">
+            <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl mb-6 text-xs font-semibold uppercase">
+                <span x-text="error"></span>
+            </div>
+        </template>
+
+        <div class="mb-12">
+            <div class="flex items-center gap-2.5 mb-5 ml-1 text-slate-800">
+                <i data-lucide="activity" class="w-4 h-4"></i>
+                <h2 class="text-sm font-bold uppercase tracking-[0.3em]" x-text="'Active Month: ' + getSelectedSheetLabel()"></h2>
+            </div>
+        
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-5">
+                <div class="bg-white p-4 px-5 rounded-2xl shadow-sm border-l-4 border-slate-700 transition-all hover:shadow-md">
+                    <div class="flex justify-between items-start mb-1">
+                        <span class="text-slate-500 text-[10px] font-semibold uppercase tracking-wider">FFB Balance</span>
+                        <i data-lucide="activity" class="text-slate-400 w-3 h-3"></i>
+                    </div>
+                    <div class="text-xl font-bold text-slate-900 tracking-tight" x-text="formatNum(activeStats.ffb)"></div>
+                </div>
+                <div class="bg-white p-4 px-5 rounded-2xl shadow-sm border-l-4 border-blue-600 transition-all hover:shadow-md">
+                    <div class="flex justify-between items-start mb-1">
+                        <span class="text-slate-500 text-[10px] font-semibold uppercase tracking-wider">Available IS-CSPO</span>
+                        <div class="w-1.5 h-1.5 rounded-full bg-blue-600"></div>
+                    </div>
+                    <div class="text-xl font-bold text-slate-900 tracking-tight" x-text="formatNum(activeStats.cspo)"></div>
+                </div>
+                <div class="bg-white p-4 px-5 rounded-2xl shadow-sm border-l-4 border-orange-500 transition-all hover:shadow-md">
+                    <div class="flex justify-between items-start mb-1">
+                        <span class="text-slate-500 text-[10px] font-semibold uppercase tracking-wider">Available IS-CSPKO</span>
+                        <div class="w-1.5 h-1.5 rounded-full bg-orange-500"></div>
+                    </div>
+                    <div class="text-xl font-bold text-slate-900 tracking-tight" x-text="formatNum(activeStats.cspko)"></div>
+                </div>
+                <div class="bg-white p-4 px-5 rounded-2xl shadow-sm border-l-4 border-red-600 transition-all hover:shadow-md">
+                    <div class="flex justify-between items-start mb-1">
+                        <span class="text-slate-500 text-[10px] font-semibold uppercase tracking-wider">Available IS-CSPKE</span>
+                        <div class="w-1.5 h-1.5 rounded-full bg-red-600"></div>
+                    </div>
+                    <div class="text-xl font-bold text-slate-900 tracking-tight" x-text="formatNum(activeStats.cspke)"></div>
+                </div>
+            </div>
+
+            <div class="space-y-6">
+                <template x-for="risk in RISK_CONFIG" :key="risk.key">
+                    <div x-show="hasRiskData(risk.label)" class="bg-white p-5 md:p-6 rounded-[2.5rem] shadow-sm border border-slate-100 cursor-help mb-8 transition-shadow hover:shadow-md"
+                         :id="'active-risk-' + risk.key.replace(/\s+/g, '-')"
+                         @contextmenu.prevent="exportAsImage('active-risk-' + risk.key.replace(/\s+/g, '-'), getSelectedSheetLabel() + '-' + risk.label)">
+                        
+                        <div class="flex items-center gap-3 mb-5">
+                            <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-100" :style="{ color: risk.color }">
+                                <i :data-lucide="risk.iconName" class="w-5 h-5"></i>
+                            </div>
+                            <h2 class="text-lg font-bold text-slate-900 uppercase tracking-tight" x-text="risk.label"></h2>
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
+                            <div class="bg-white p-3.5 px-4 rounded-xl border border-slate-100 border-l-4 border-l-slate-400">
+                                <p class="text-[9px] font-semibold text-slate-400 mb-0.5 uppercase tracking-wider">FFB BALANCE</p>
+                                <p class="text-lg font-bold text-slate-900 tracking-tighter" x-text="formatNum(getRiskStats(risk.label).ffb)"></p>
+                            </div>
+                            <div class="bg-white p-3.5 px-4 rounded-xl border border-slate-100 border-l-4 border-l-blue-600">
+                                <p class="text-[9px] font-semibold text-slate-400 mb-0.5 uppercase tracking-wider">AVAILABLE IS-CSPO</p>
+                                <p class="text-lg font-bold text-slate-900 tracking-tighter" x-text="formatNum(getRiskStats(risk.label).cspo)"></p>
+                            </div>
+                            <div class="bg-white p-3.5 px-4 rounded-xl border border-slate-100 border-l-4 border-l-orange-500">
+                                <p class="text-[9px] font-semibold text-slate-400 mb-0.5 uppercase tracking-wider">AVAILABLE IS-CSPKO</p>
+                                <p class="text-lg font-bold text-slate-900 tracking-tighter" x-text="formatNum(getRiskStats(risk.label).cspko)"></p>
+                            </div>
+                            <div class="bg-white p-3.5 px-4 rounded-xl border border-slate-100 border-l-4 border-l-red-600">
+                                <p class="text-[9px] font-semibold text-slate-400 mb-0.5 uppercase tracking-wider">AVAILABLE IS-CSPKE</p>
+                                <p class="text-lg font-bold text-slate-900 tracking-tighter" x-text="formatNum(getRiskStats(risk.label).cspke)"></p>
+                            </div>
+                        </div>
+
+                        <div class="bg-white p-4 rounded-[1.5rem] border border-slate-100 mb-5">
+                            <div class="h-[240px] w-full relative">
+                                <canvas :id="'canvas-risk-' + risk.key.replace(/\s+/g, '-')"></canvas>
+                            </div>
+                        </div>
+
+                        <div class="bg-slate-50/50 rounded-[1rem] overflow-hidden border border-slate-100">
+                            <div class="bg-white/50 px-4 py-2 flex items-center gap-2 border-b border-slate-100">
+                                <i data-lucide="globe" class="text-slate-400 w-3 h-3"></i>
+                                <h3 class="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Summary</h3>
+                            </div>
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-left border-collapse">
+                                    <thead>
+                                        <tr class="bg-white">
+                                            <th class="px-5 py-2.5 text-[9px] font-bold uppercase text-slate-500 border-b border-slate-100">Country</th>
+                                            <th class="px-5 py-2.5 text-[9px] font-bold uppercase text-slate-500 border-b border-slate-100 text-right">FFB Balance</th>
+                                            <th class="px-5 py-2.5 text-[9px] font-bold uppercase text-blue-600 border-b border-slate-100 text-right">IS-CSPO</th>
+                                            <th class="px-5 py-2.5 text-[9px] font-bold uppercase text-orange-600 border-b border-slate-100 text-right">IS-CSPKO</th>
+                                            <th class="px-5 py-2.5 text-[9px] font-bold uppercase text-red-600 border-b border-slate-100 text-right">IS-CSPKE</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="bg-white/30">
+                                        <template x-for="item in getRiskAggregatedData(risk.label)" :key="item.country">
+                                            <tr class="hover:bg-white transition-colors border-b border-slate-100">
+                                                <td class="px-5 py-2 font-bold text-[11px] text-slate-800" x-text="item.country"></td>
+                                                <td class="px-5 py-2 text-[11px] font-semibold text-right text-slate-600" x-text="formatNum(item.ffb)"></td>
+                                                <td class="px-5 py-2 text-[11px] font-semibold text-right text-blue-700" x-text="formatNum(item.cspo)"></td>
+                                                <td class="px-5 py-2 text-[11px] font-semibold text-right text-orange-700" x-text="formatNum(item.cspko)"></td>
+                                                <td class="px-5 py-2 text-[11px] font-semibold text-right text-red-800" x-text="formatNum(item.cspke)"></td>
+                                            </tr>
+                                        </template>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </div>
+
+        <div class="pt-8 border-t-2 border-slate-200">
+            <div class="flex items-center gap-2.5 mb-6 ml-1 text-slate-800">
+                <i data-lucide="layout-grid" class="w-5 h-5"></i>
+                <h2 class="text-sm font-bold uppercase tracking-[0.3em]">Historical Trends</h2>
+            </div>
+
+            <template x-for="type in ['IS-CSPO', 'IS-CSPKO', 'IS-CSPKE']" :key="type">
+                <div :id="'trend-section-' + type" @contextmenu.prevent="exportAsImage('trend-section-' + type, type + '-Trends')"
+                     class="bg-slate-100/70 p-5 md:p-6 rounded-[2.5rem] shadow-sm border border-slate-200/60 cursor-help group mb-10">
+                    
+                    <div class="flex items-center justify-between mb-6 border-b border-slate-200/60 pb-3">
+                        <div class="flex items-center gap-3 text-slate-900">
+                            <div class="p-2.5 bg-slate-900 text-white rounded-2xl shadow-md">
+                                <i data-lucide="trending-up" class="w-5 h-5"></i>
+                            </div>
+                            <h2 class="text-lg md:text-xl font-bold uppercase tracking-tight" x-text="type + ' (Potential + Available Credit)'"></h2>
+                        </div>
+                        <div class="text-[9px] font-bold uppercase text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-2">
+                            <i data-lucide="download" class="w-3 h-3"></i> Right-click to export
+                        </div>
+                    </div>
+
+                    <div class="flex flex-col gap-6">
+                        <template x-for="rConf in RISK_CONFIG" :key="rConf.label">
+                            <div class="flex flex-col lg:flex-row gap-5 items-stretch">
+                                <div class="w-full lg:w-[42%] bg-white border border-slate-100 rounded-3xl p-4 shadow-sm flex flex-col hover:shadow-md transition-shadow">
+                                    <div class="flex items-center gap-2 mb-3 border-b border-slate-100 pb-2">
+                                        <div class="p-1.5 rounded-lg" :style="{ backgroundColor: rConf.color + '15', color: rConf.color }">
+                                            <i :data-lucide="rConf.iconName" class="w-3.5 h-3.5"></i>
+                                        </div>
+                                        <h2 class="text-sm font-bold uppercase text-slate-800 leading-none" x-text="rConf.label"></h2>
+                                    </div>
+                                    <div class="flex-grow min-h-[220px] relative">
+                                        <canvas :id="'canvas-trend-' + type + '-' + rConf.label.replace(/\s+/g, '-')"></canvas>
+                                    </div>
+                                </div>
+
+                                <div class="w-full lg:w-[58%] bg-white border border-slate-100 rounded-3xl overflow-hidden shadow-sm flex flex-col hover:shadow-md transition-shadow">
+                                    <div class="bg-slate-50/50 px-4 py-2 border-b border-slate-100 flex justify-between items-center">
+                                        <span class="text-[9px] font-bold uppercase tracking-wider text-slate-500" x-text="rConf.label + ' Details'"></span>
+                                    </div>
+                                    <div class="overflow-x-auto flex-grow">
+                                        <table class="w-full text-left border-collapse h-full">
+                                            <thead>
+                                                <tr class="text-slate-500 border-b border-slate-100 uppercase text-[9px]">
+                                                    <th class="px-4 py-1.5 font-bold text-slate-700">Country</th>
+                                                    <template x-for="m in MONTHS_CONFIG" :key="m.label">
+                                                        <th class="px-2 py-1.5 text-right font-bold text-slate-700" x-text="formatMonthForTable(m.label)"></th>
+                                                    </template>
+                                                </tr>
+                                            </thead>
+                                            <tbody class="text-[10px]">
+                                                <template x-for="cName in getTrendCountries(type, rConf.label)" :key="cName">
+                                                    <tr class="border-b border-slate-100 hover:bg-slate-50/50 transition-colors">
+                                                        <td class="px-4 py-1.5 text-slate-800 font-bold" x-text="cName"></td>
+                                                        <template x-for="m in MONTHS_CONFIG" :key="m.label">
+                                                            <td class="text-right px-2 py-1.5 text-slate-600 font-semibold" 
+                                                                x-text="getTrendValue(type, rConf.label, m.label, cName)">
+                                                            </td>
+                                                        </template>
+                                                    </tr>
+                                                </template>
+                                                <tr class="bg-slate-700">
+                                                    <td class="px-4 py-1.5 font-bold uppercase text-white tracking-widest text-[10px]">Total</td>
+                                                    <template x-for="m in MONTHS_CONFIG" :key="m.label">
+                                                        <td class="text-right px-2 py-1.5 font-bold text-white text-[10px]"
+                                                            x-text="getTrendTotal(type, rConf.label, m.label)">
+                                                        </td>
+                                                    </template>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </template>
+        </div>
+
+        <footer class="mt-16 py-6 border-t border-slate-200 text-slate-400 text-[9px] font-semibold uppercase tracking-[0.3em] flex justify-between">
+            <p>© 2026 ISH RISK INTELLIGENCE • PREMIUM COMPACT EDITION</p>
+            <p x-text="'Range: ' + MONTHS_CONFIG.length + ' Months Linked'"></p>
+        </footer>
+    </div>
+
+    <script>
+        // Configuration Mirrors
+        const MONTHS_CONFIG = [
+            { label: 'Jan 2026', gid: '685574466' }, 
+            { label: 'Feb 2026', gid: '6363767' },   
+            { label: 'Mar 2026', gid: '505798698' },
+            { label: 'Apr 2026', gid: '1291665541' },
+            { label: 'May 2026', gid: '1984081462' },
+        ];
+
+        const RISK_CONFIG = [
+            { key: '1.High Risk', label: 'High Risk', iconName: 'shield-alert', color: '#ef4444' },
+            { key: '2.Medium Risk', label: 'Medium Risk', iconName: 'shield', color: '#f59e0b' },
+            { key: '3.Low Risk', label: 'Low Risk', iconName: 'shield-check', color: '#10b981' }
+        ];
+
+        const CREDIT_MAPPING = {
+            'IS-CSPO': { potential: 'Potential IS-CSPO credits', available: 'Available Credits (IS-CSPO)' },
+            'IS-CSPKO': { potential: 'Potential IS-CSPKO credits', available: 'Available Credits (IS-CSPKO)' },
+            'IS-CSPKE': { potential: 'Potential IS-CSPKE credits', available: 'Available Credits (IS-CSPKE)' }
+        };
+
+        const BASE_PUB_URL = `https://docs.google.com/spreadsheets/d/e/2PACX-1vTHFmMgMKi24smbuf-YLZwTiTcqn4V_ldkcg2Aczwr6HMlLMeQWMjMRReezdTWLDthd8PYCDwNfsgUi/pub?output=csv`;
+
+        function ishApp() {
+            return {
+                MONTHS_CONFIG,
+                RISK_CONFIG,
+                activeData: [],
+                allMonthsData: {},
+                lastUpdated: null,
+                selectedSheetGid: '1984081462', // May 2026 initial selection
+                isLoading: false,
+                isExporting: false,
+                error: null,
+                charts: {},
+
+                init() {
+                    // Fetch data on init
+                    this.fetchData(this.selectedSheetGid);
+                },
+
+                // Get label from current selected GID
+                getSelectedSheetLabel() {
+                    const match = this.MONTHS_CONFIG.find(m => m.gid === this.selectedSheetGid);
+                    return match ? match.label : '';
+                },
+
+                changeSheet() {
+                    this.fetchData(this.selectedSheetGid);
+                },
+
+                formatNum(num) {
+                    if (typeof num !== 'number') return "0.00";
+                    return num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                },
+
+                formatMonthForTable(monthStr) {
+                    const parts = monthStr.split(' ');
+                    if (parts.length < 2) return monthStr;
+                    return `${parts[0]} ${parts[1].slice(-2)}`;
+                },
+
+                splitCsvLine(line) {
+                    const result = [];
+                    let current = '';
+                    let inQuotes = false;
+                    for (let i = 0; i < line.length; i++) {
+                        const char = line[i];
+                        if (char === '"') inQuotes = !inQuotes;
+                        else if (char === ',' && !inQuotes) { result.push(current.trim()); current = ''; }
+                        else current += char;
+                    }
+                    result.push(current.trim());
+                    return result;
+                },
+
+                parseCSVData(text) {
+                    const lines = text.split(/\r?\n/);
+                    if (lines.length < 2) return [];
+                    const headers = this.splitCsvLine(lines[0]).map(h => h.replace(/^"|"$/g, '').trim());
+                    return lines.slice(1)
+                        .filter(line => line.trim() !== '')
+                        .map(line => {
+                            const values = this.splitCsvLine(line);
+                            const rowData = {};
+                            headers.forEach((header, index) => {
+                                let val = values[index] ? values[index].replace(/^"|"$/g, '').trim() : '';
+                                const isNumeric = header.includes('Balance') || header.includes('Credits') || header.includes('Volumn') || header.includes('Potential');
+                                if (isNumeric) val = parseFloat(val.replace(/,/g, '')) || 0;
+                                rowData[header] = val;
+                            });
+                            return rowData;
+                        })
+                        .filter(d => d['Country']);
+                },
+
+                async fetchAllHistory() {
+                    for (const m of this.MONTHS_CONFIG) {
+                        try {
+                            const url = `${BASE_PUB_URL}&gid=${m.gid}&t=${new Date().getTime()}`;
+                            const res = await fetch(url);
+                            if (res.ok) {
+                                const text = await res.text();
+                                this.allMonthsData[m.label] = this.parseCSVData(text);
+                            }
+                        } catch (e) {
+                            console.error(`Error loading history`, e);
+                        }
+                    }
+                    // Re-render trends graph on updating state
+                    this.$nextTick(() => this.renderHistoricalTrendCharts());
+                },
+
+                async fetchData(targetGid) {
+                    if (!targetGid) return;
+                    this.isLoading = true;
+                    this.error = null;
+                    try {
+                        const finalUrl = `${BASE_PUB_URL}&gid=${targetGid}&t=${new Date().getTime()}`;
+                        const response = await fetch(finalUrl);
+                        if (!response.ok) throw new Error(`HTTP Error ${response.status}`);
+                        const text = await response.text();
+                        this.activeData = this.parseCSVData(text);
+                        this.lastUpdated = new Date().toLocaleTimeString();
+                        
+                        // Sync UI vectors & run historical pull
+                        this.$nextTick(() => {
+                            lucide.createIcons();
+                            this.renderActiveRiskCharts();
+                        });
+                        await this.fetchAllHistory();
+                    } catch (err) {
+                        this.error = err.message === 'Failed to fetch' ? "CORS Policy limitation. Please use Manual CSV Upload." : err.message;
+                    } finally {
+                        this.isLoading = false;
+                    }
+                },
+
+                handleManualUpload(event) {
+                    const file = event.target.files[0];
+                    if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        const parsed = this.parseCSVData(e.target.result);
+                        if (parsed.length > 0) {
+                            this.activeData = parsed;
+                            this.lastUpdated = "File: " + file.name;
+                            this.error = null;
+                            this.$nextTick(() => {
+                                lucide.createIcons();
+                                this.renderActiveRiskCharts();
+                            });
+                        }
+                    };
+                    reader.readAsText(file);
+                },
+
+                async exportAsImage(elementId, name) {
+                    this.isExporting = true;
+                    const element = document.getElementById(elementId);
+                    if (element) {
+                        try {
+                            const canvas = await window.html2canvas(element, { backgroundColor: '#ffffff', scale: 2, useCORS: true, windowWidth: element.scrollWidth });
+                            const link = document.createElement('a');
+                            link.href = canvas.toDataURL("image/png");
+                            link.download = `ISH-Report-${name}.png`;
+                            link.click();
+                        } catch (err) {
+                            console.error("Export Failed", err);
+                        }
+                    }
+                    this.isExporting = false;
+                },
+
+                // Global Stats Computed Object
+                get activeStats() {
+                    return {
+                        ffb: this.activeData.reduce((acc, curr) => acc + (curr['FFB Balance'] || 0), 0),
+                        cspo: this.activeData.reduce((acc, curr) => acc + (curr['Available Credits (IS-CSPO)'] || 0), 0),
+                        cspko: this.activeData.reduce((acc, curr) => acc + (curr['Available Credits (IS-CSPKO)'] || 0), 0),
+                        cspke: this.activeData.reduce((acc, curr) => acc + (curr['Available Credits (IS-CSPKE)'] || 0), 0),
+                    };
+                },
+
+                hasRiskData(riskLabel) {
+                    return this.activeData.some(d => String(d['Risk Level']).includes(riskLabel));
+                },
+
+                getRiskStats(riskLabel) {
+                    const subset = this.activeData.filter(d => String(d['Risk Level']).includes(riskLabel));
+                    return {
+                        ffb: subset.reduce((acc, curr) => acc + (curr['FFB Balance'] || 0), 0),
+                        cspo: subset.reduce((acc, curr) => acc + (curr['Available Credits (IS-CSPO)'] || 0), 0),
+                        cspko: subset.reduce((acc, curr) => acc + (curr['Available Credits (IS-CSPKO)'] || 0), 0),
+                        cspke: subset.reduce((acc, curr) => acc + (curr['Available Credits (IS-CSPKE)'] || 0), 0),
+                    };
+                },
+
+                getRiskAggregatedData(riskLabel) {
+                    const subset = this.activeData.filter(d => String(d['Risk Level']).includes(riskLabel));
+                    const aggregated = subset.reduce((acc, curr) => {
+                        const country = curr['Country'];
+                        if (!country) return acc;
+                        if (!acc[country]) acc[country] = { country, ffb: 0, cspo: 0, cspko: 0, cspke: 0 };
+                        acc[country].ffb += curr['FFB Balance'] || 0;
+                        acc[country].cspo += curr['Available Credits (IS-CSPO)'] || 0;
+                        acc[country].cspko += curr['Available Credits (IS-CSPKO)'] || 0;
+                        acc[country].cspke += curr['Available Credits (IS-CSPKE)'] || 0;
+                        return acc;
+                    }, {});
+                    return Object.values(aggregated).sort((a, b) => b.ffb - a.ffb);
+                },
+
+                // Historical helper calculations
+                getTrendCountries(type, riskLabel) {
+                    const countrySet = new Set();
+                    this.MONTHS_CONFIG.forEach(m => {
+                        const mData = this.allMonthsData[m.label] || [];
+                        mData.filter(d => String(d['Risk Level']).includes(riskLabel)).forEach(d => {
+                            if (d['Country']) countrySet.add(d['Country']);
+                        });
+                    });
+                    return Array.from(countrySet).sort();
+                },
+
+                getTrendValue(type, riskLabel, monthLabel, countryName) {
+                    const mData = this.allMonthsData[monthLabel] || [];
+                    const record = mData.find(d => String(d['Risk Level']).includes(riskLabel) && d['Country'] === countryName);
+                    if (!record) return '-';
+                    const map = CREDIT_MAPPING[type];
+                    const val = (record[map.potential] || 0) + (record[map.available] || 0);
+                    return val ? Math.round(val).toLocaleString() : '-';
+                },
+
+                getTrendTotal(type, riskLabel, monthLabel) {
+                    const mData = this.allMonthsData[monthLabel] || [];
+                    const map = CREDIT_MAPPING[type];
+                    const sum = mData
+                        .filter(d => String(d['Risk Level']).includes(riskLabel))
+                        .reduce((acc, curr) => acc + (curr[map.potential] || 0) + (curr[map.available] || 0), 0);
+                    return Math.round(sum).toLocaleString();
+                },
+
+                // --- Chart.js Rendering Logic ---
+                renderActiveRiskCharts() {
+                    this.RISK_CONFIG.forEach(risk => {
+                        const chartData = this.getRiskAggregatedData(risk.label);
+                        const canvasId = 'canvas-risk-' + risk.key.replace(/\s+/g, '-');
+                        const canvasEl = document.getElementById(canvasId);
+                        if (!canvasEl) return;
+
+                        if (this.charts[canvasId]) this.charts[canvasId].destroy();
+
+                        this.charts[canvasId] = new Chart(canvasEl.getContext('2d'), {
+                            type: 'bar',
+                            data: {
+                                labels: chartData.map(d => d.country),
+                                datasets: [
+                                    {
+                                        type: 'bar',
+                                        label: 'FFB Balance',
+                                        data: chartData.map(d => d.ffb),
+                                        backgroundColor: '#64748b',
+                                        yAxisID: 'yLeft',
+                                        barThickness: 24,
+                                        borderRadius: 4
+                                    },
+                                    {
+                                        type: 'line',
+                                        label: 'Available IS-CSPO',
+                                        data: chartData.map(d => d.cspo),
+                                        borderColor: '#2563eb',
+                                        backgroundColor: '#2563eb',
+                                        borderWidth: 2,
+                                        yAxisID: 'yRight',
+                                        tension: 0.1,
+                                        pointRadius: 3
+                                    },
+                                    {
+                                        type: 'line',
+                                        label: 'Available IS-CSPKO',
+                                        data: chartData.map(d => d.cspko),
+                                        borderColor: '#f59e0b',
+                                        backgroundColor: '#f59e0b',
+                                        borderWidth: 2,
+                                        yAxisID: 'yRight',
+                                        tension: 0.1,
+                                        pointRadius: 3
+                                    },
+                                    {
+                                        type: 'line',
+                                        label: 'Available IS-CSPKE',
+                                        data: chartData.map(d => d.cspke),
+                                        borderColor: '#dc2626',
+                                        backgroundColor: '#dc2626',
+                                        borderWidth: 2,
+                                        yAxisID: 'yRight',
+                                        tension: 0.1,
+                                        pointRadius: 3
+                                    }
+                                ]
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                plugins: {
+                                    legend: { position: 'top', align: 'end', labels: { boxWidth: 8, font: { size: 9, weight: 600 } } },
+                                    tooltip: {
+                                        callbacks: {
+                                            label: (context) => ` ${context.dataset.label}: ${context.raw.toLocaleString(undefined, {minimumFractionDigits: 2})}`
+                                        }
+                                    }
+                                },
+                                scales: {
+                                    x: { grid: { display: false }, ticks: { font: { size: 10, weight: 600 }, color: '#475569' } },
+                                    yLeft: { position: 'left', grid: { color: '#f1f5f9' }, ticks: { font: { size: 9 }, color: '#475569' } },
+                                    yRight: { position: 'right', grid: { display: false }, ticks: { font: { size: 9 }, color: '#475569' } }
+                                }
+                            }
+                        });
+                    });
+                },
+
+                renderHistoricalTrendCharts() {
+                    ['IS-CSPO', 'IS-CSPKO', 'IS-CSPKE'].forEach(type => {
+                        this.RISK_CONFIG.forEach(rConf => {
+                            const canvasId = `canvas-trend-${type}-${rConf.label.replace(/\s+/g, '-')}`;
+                            const canvasEl = document.getElementById(canvasId);
+                            if (!canvasEl) return;
+
+                            if (this.charts[canvasId]) this.charts[canvasId].destroy();
+
+                            // Aggregate totals array across months config mapping
+                            const seriesData = this.MONTHS_CONFIG.map(m => {
+                                const mData = this.allMonthsData[m.label] || [];
+                                const total = mData
+                                    .filter(d => String(d['Risk Level']).includes(rConf.label))
+                                    .reduce((acc, curr) => acc + (curr[CREDIT_MAPPING[type].potential] || 0) + (curr[CREDIT_MAPPING[type].available] || 0), 0);
+                                return total;
+                            });
+
+                            this.charts[canvasId] = new Chart(canvasEl.getContext('2d'), {
+                                type: 'bar',
+                                data: {
+                                    labels: this.MONTHS_CONFIG.map(m => m.label),
+                                    datasets: [{
+                                        label: 'Total',
+                                        data: seriesData,
+                                        backgroundColor: rConf.color,
+                                        borderRadius: 4,
+                                        barThickness: 25
+                                    }]
+                                },
+                                options: {
+                                    responsive: true,
+                                    maintainAspectRatio: false,
+                                    plugins: { legend: { display: false } },
+                                    scales: {
+                                        x: { grid: { display: false }, ticks: { font: { size: 10, weight: 600 }, color: '#475569' } },
+                                        y: { grid: { color: '#f1f5f9' }, ticks: { font: { size: 10, weight: 600 }, color: '#475569' } }
+                                    }
+                                }
+                            });
+                        });
+                    });
+                }
+            }
+        }
+    </script>
+</body>
+</html>
