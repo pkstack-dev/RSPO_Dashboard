@@ -509,7 +509,7 @@
                     return Math.round(sum).toLocaleString();
                 },
 
-                // --- Chart.js Rendering Logic ---
+                // --- ปรับปรุง Chart.js Rendering Logic ให้เหมือน Recharts ต้นฉบับ ---
                 renderActiveRiskCharts() {
                     this.RISK_CONFIG.forEach(risk => {
                         const chartData = this.getRiskAggregatedData(risk.label);
@@ -528,43 +528,53 @@
                                         type: 'bar',
                                         label: 'FFB Balance',
                                         data: chartData.map(d => d.ffb),
-                                        backgroundColor: '#64748b',
+                                        backgroundColor: '#64748b', // สี Slate เดิม 
                                         yAxisID: 'yLeft',
-                                        barThickness: 24,
-                                        borderRadius: 4
+                                        barPercentage: 0.25, // ทำให้แท่งผอมลง มินิมอลแบบต้นฉบับ
+                                        maxBarThickness: 34, // ล็อคความหนาแท่งสูงสุด 
+                                        borderRadius: { topLeft: 4, topRight: 4, bottomLeft: 0, bottomRight: 0 } // มนเฉพาะปลายบน 
                                     },
                                     {
                                         type: 'line',
                                         label: 'Available IS-CSPO',
                                         data: chartData.map(d => d.cspo),
                                         borderColor: '#2563eb',
-                                        backgroundColor: '#2563eb',
-                                        borderWidth: 2,
+                                        backgroundColor: '#ffffff', // พื้นจุดสีขาวตัดขอบ 
+                                        borderWidth: 2, // เส้นหนา 2px กำลังสวย 
                                         yAxisID: 'yRight',
-                                        tension: 0.1,
-                                        pointRadius: 3
+                                        tension: 0.2, // มีความโค้งมนเล็กน้อยแบบธรรมชาติ
+                                        pointRadius: 3, // จุดขนาดเล็ก 
+                                        pointHoverRadius: 5,
+                                        pointBorderColor: '#2563eb',
+                                        pointBorderWidth: 1.5
                                     },
                                     {
                                         type: 'line',
                                         label: 'Available IS-CSPKO',
                                         data: chartData.map(d => d.cspko),
                                         borderColor: '#f59e0b',
-                                        backgroundColor: '#f59e0b',
-                                        borderWidth: 2,
+                                        backgroundColor: '#ffffff', [cite: 195]
+                                        borderWidth: 2, [cite: 195]
                                         yAxisID: 'yRight',
-                                        tension: 0.1,
-                                        pointRadius: 3
+                                        tension: 0.2,
+                                        pointRadius: 3, [cite: 195]
+                                        pointHoverRadius: 5,
+                                        pointBorderColor: '#f59e0b',
+                                        pointBorderWidth: 1.5
                                     },
                                     {
                                         type: 'line',
                                         label: 'Available IS-CSPKE',
                                         data: chartData.map(d => d.cspke),
                                         borderColor: '#dc2626',
-                                        backgroundColor: '#dc2626',
-                                        borderWidth: 2,
+                                        backgroundColor: '#ffffff', [cite: 195]
+                                        borderWidth: 2, [cite: 195]
                                         yAxisID: 'yRight',
-                                        tension: 0.1,
-                                        pointRadius: 3
+                                        tension: 0.2,
+                                        pointRadius: 3, [cite: 195]
+                                        pointHoverRadius: 5,
+                                        pointBorderColor: '#dc2626',
+                                        pointBorderWidth: 1.5
                                     }
                                 ]
                             },
@@ -572,17 +582,62 @@
                                 responsive: true,
                                 maintainAspectRatio: false,
                                 plugins: {
-                                    legend: { position: 'top', align: 'end', labels: { boxWidth: 8, font: { size: 9, weight: 600 } } },
+                                    legend: { 
+                                        position: 'top', 
+                                        align: 'end', 
+                                        labels: { 
+                                            boxWidth: 6, // เปลี่ยนเป็นจุดวงกลมเล็กๆ แทนกล่องสี่เหลี่ยมหนาๆ 
+                                            usePointStyle: true, 
+                                            pointStyle: 'circle',
+                                            font: { size: 9, weight: 600, family: "'Inter', sans-serif" },
+                                            color: '#475569',
+                                            padding: 15
+                                        } 
+                                    },
                                     tooltip: {
+                                        backgroundColor: '#ffffff', // พื้นหลังขาวตามดีไซน์ Recharts [cite: 193]
+                                        titleColor: '#0f172a',
+                                        bodyColor: '#475569',
+                                        borderColor: '#e2e8f0', // ขอบจางๆ 
+                                        borderWidth: 1,
+                                        borderRadius: 10, // ความโค้งมน 10px [cite: 193]
+                                        padding: 8, [cite: 194]
+                                        titleFont: { size: 10, weight: 700 },
+                                        bodyFont: { size: 10, weight: 600 }, [cite: 194]
+                                        boxWidth: 6,
+                                        boxPadding: 4,
+                                        usePointStyle: true,
                                         callbacks: {
-                                            label: (context) => ` ${context.dataset.label}: ${context.raw.toLocaleString(undefined, {minimumFractionDigits: 2})}`
+                                            label: (context) => ` ${context.dataset.label}: ${context.raw.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`
                                         }
                                     }
                                 },
                                 scales: {
-                                    x: { grid: { display: false }, ticks: { font: { size: 10, weight: 600 }, color: '#475569' } },
-                                    yLeft: { position: 'left', grid: { color: '#f1f5f9' }, ticks: { font: { size: 9 }, color: '#475569' } },
-                                    yRight: { position: 'right', grid: { display: false }, ticks: { font: { size: 9 }, color: '#475569' } }
+                                    x: { 
+                                        grid: { display: false }, // ซ่อนเส้นกริดแนวตั้ง 
+                                        border: { display: false }, // ซ่อนเส้นขอบแกนฐาน 
+                                        ticks: { font: { size: 10, weight: 600 }, color: '#475569' } [cite: 192]
+                                    },
+                                    yLeft: { 
+                                        position: 'left', 
+                                        border: { display: false }, // ซ่อนเส้นขอบแกนซ้าย [cite: 193]
+                                        grid: { color: '#f1f5f9', drawTicks: false }, // เส้นกริดแนวนอนแบบบางมาก 
+                                        ticks: { 
+                                            font: { size: 9, weight: 500 }, [cite: 193]
+                                            color: '#475569',
+                                            callback: function(value) { return value.toLocaleString(); }
+                                        } 
+                                    },
+                                    yRight: { 
+                                        position: 'right', 
+                                        border: { display: false }, // ซ่อนเส้นขอบแกนขวา [cite: 193]
+                                        grid: { display: false }, // ไม่ซ้อนเส้นกริดซ้ำซ้อน [cite: 193]
+                                        ticks: { 
+                                            font: { size: 9, weight: 500 }, [cite: 193]
+                                            color: '#475569',
+                                            callback: function(value) { return value.toLocaleString(); }
+                                        } 
+                                    }
                                 }
                             }
                         });
