@@ -266,13 +266,13 @@
     </div>
 
     <script>
-        // 1. ปรับลำดับเอาเดือนล่าสุด (May 2026) ขึ้นก่อน เพื่อให้ Tag Select แสดงผลตรงกับค่าเริ่มต้น
+        // Configuration Mirrors
         const MONTHS_CONFIG = [
-            { label: 'May 2026', gid: '1984081462' },
-            { label: 'Apr 2026', gid: '1291665541' },
-            { label: 'Mar 2026', gid: '505798698' },
+            { label: 'Jan 2026', gid: '685574466' }, 
             { label: 'Feb 2026', gid: '6363767' },   
-            { label: 'Jan 2026', gid: '685574466' }
+            { label: 'Mar 2026', gid: '505798698' },
+            { label: 'Apr 2026', gid: '1291665541' },
+            { label: 'May 2026', gid: '1984081462' },
         ];
 
         const RISK_CONFIG = [
@@ -296,15 +296,15 @@
                 activeData: [],
                 allMonthsData: {},
                 lastUpdated: null,
-                selectedSheetGid: '1984081462', // GID ของ May 2026
+                selectedSheetGid: '1984081462', // ตั้งค่าเริ่มต้นโหลดเดือนล่าสุด May 2026 อัตโนมัติ
                 isLoading: false,
                 isExporting: false,
                 error: null,
                 charts: {},
 
                 init() {
-                    // 2. บังคับโหลดดึงข้อมูลและซิงค์ UI ให้เป็นเดือน May 2026 ทันทีที่เปิดหน้าเว็บ
-                    this.changeSheet();
+                    // โหลดข้อมูลเดือน May 2026 เป็น Default แรกเริ่ม
+                    this.fetchData(this.selectedSheetGid);
                 },
 
                 getSelectedSheetLabel() {
@@ -504,6 +504,7 @@
                     return Math.round(sum).toLocaleString();
                 },
 
+                // --- ปรับแต่งระบบเรนเดอร์กราฟให้ถอดดีไซน์มาจาก Recharts ต้นฉบับ ---
                 renderActiveRiskCharts() {
                     this.RISK_CONFIG.forEach(risk => {
                         const chartData = this.getRiskAggregatedData(risk.label);
@@ -524,20 +525,20 @@
                                         data: chartData.map(d => d.ffb),
                                         backgroundColor: '#64748b',
                                         yAxisID: 'yLeft',
-                                        barPercentage: 0.25,
+                                        barPercentage: 0.25, // บีบให้ขนาดแท่งผอมลง มินิมอลเหมือนต้นฉบับ
                                         maxBarThickness: 34,
-                                        borderRadius: { topLeft: 4, topRight: 4, bottomLeft: 0, bottomRight: 0 }
+                                        borderRadius: { topLeft: 4, topRight: 4, bottomLeft: 0, bottomRight: 0 } // ปลายมนเฉพาะด้านบน
                                     },
                                     {
                                         type: 'line',
                                         label: 'Available IS-CSPO',
                                         data: chartData.map(d => d.cspo),
                                         borderColor: '#2563eb',
-                                        backgroundColor: '#ffffff',
+                                        backgroundColor: '#ffffff', // พื้นจุดขาวตัดขอบ
                                         borderWidth: 2,
                                         yAxisID: 'yRight',
-                                        tension: 0.2,
-                                        pointRadius: 3,
+                                        tension: 0.2, // เพิ่มความสมูทโค้งมนเล็กน้อยแบบ Recharts
+                                        pointRadius: 3, // ขนาดจุดเล็กลงคลีนๆ
                                         pointHoverRadius: 5,
                                         pointBorderColor: '#2563eb',
                                         pointBorderWidth: 1.5
@@ -580,7 +581,7 @@
                                         position: 'top', 
                                         align: 'end', 
                                         labels: { 
-                                            boxWidth: 6, 
+                                            boxWidth: 6, // เปลี่ยนจากสี่เหลี่ยมทึบหนาๆ เป็นจุดวงกลมเล็กสไตล์คลีน
                                             usePointStyle: true, 
                                             pointStyle: 'circle',
                                             font: { size: 9, weight: 600, family: "'Inter', sans-serif" },
@@ -589,12 +590,12 @@
                                         } 
                                     },
                                     tooltip: {
-                                        backgroundColor: '#ffffff',
+                                        backgroundColor: '#ffffff', // พื้นหลังขาวตามดีไซน์ Recharts
                                         titleColor: '#0f172a',
                                         bodyColor: '#475569',
                                         borderColor: '#e2e8f0',
                                         borderWidth: 1,
-                                        borderRadius: 10,
+                                        borderRadius: 10, // ความมนขอบกล่องข้อความ
                                         padding: 8,
                                         titleFont: { size: 10, weight: 700 },
                                         bodyFont: { size: 10, weight: 600 },
@@ -608,14 +609,14 @@
                                 },
                                 scales: {
                                     x: { 
-                                        grid: { display: false }, 
+                                        grid: { display: false }, // ซ่อนเส้นตารางแกนแนวตั้งทั้งหมด
                                         border: { display: false },
                                         ticks: { font: { size: 10, weight: 600 }, color: '#475569' }
                                     },
                                     yLeft: { 
                                         position: 'left', 
                                         border: { display: false },
-                                        grid: { color: '#f1f5f9', drawTicks: false },
+                                        grid: { color: '#f1f5f9', drawTicks: false }, // แบ็คกราวน์สเกลแนวนอนสีจางสุดๆ
                                         ticks: { 
                                             font: { size: 9, weight: 500 },
                                             color: '#475569',
@@ -625,7 +626,7 @@
                                     yRight: { 
                                         position: 'right', 
                                         border: { display: false },
-                                        grid: { display: false },
+                                        grid: { display: false }, // ซ่อน grid ฝั่งขวาไม่ให้ตีกันมั่ว
                                         ticks: { 
                                             font: { size: 9, weight: 500 },
                                             color: '#475569',
