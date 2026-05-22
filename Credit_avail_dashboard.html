@@ -52,7 +52,7 @@
                     <i data-lucide="calendar" class="text-slate-400 w-3.5 h-3.5"></i>
                     <select x-model="selectedSheetGid" @change="changeSheet()" class="bg-transparent text-xs font-semibold uppercase focus:outline-none cursor-pointer text-slate-800">
                         <template x-for="m in MONTHS_CONFIG" :key="m.gid">
-                            <option :value="m.gid" x-text="m.label.toUpperCase()"></option>
+                            <option :value="m.gid" x-text="m.label.toUpperCase()" :selected="m.gid === selectedSheetGid"></option>
                         </template>
                     </select>
                 </div>
@@ -305,7 +305,6 @@
                 init() {
                     // โหลดข้อมูลเดือน May 2026 เป็น Default แรกเริ่ม
                     this.fetchData(this.selectedSheetGid);
-                    changeSheet();
                 },
 
                 getSelectedSheetLabel() {
