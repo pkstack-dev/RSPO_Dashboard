@@ -16,8 +16,7 @@
         }
     </style>
 </head>
-<body class="bg-slate-50/70 p-4 md:p-8 font-sans text-slate-800 antialiased min-h-screen"
-      x-data="dashboardApp()">
+<body class="bg-slate-50/70 p-4 md:p-8 font-sans text-slate-800 antialiased min-h-screen" x-data="tradingApp()">
 
     <div class="max-w-7xl mx-auto space-y-8">
         
@@ -32,32 +31,51 @@
                 </template>
             </div>
             
-            <div class="mt-4 md:mt-0 flex flex-col items-end">
+            <div class="mt-4 md:mt-0 flex flex-wrap items-center gap-3">
+                <button @click="fetchGoogleSheetsData()" :disabled="isLoadingDefault"
+                        class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-5 py-3 rounded-2xl transition duration-300 flex items-center gap-2 font-bold shadow-sm disabled:opacity-50">
+                    <i data-lucide="refresh-cw" :class="isLoadingDefault ? 'animate-spin w-4 h-4 stroke-[2.5]' : 'w-4 h-4 stroke-[2.5]'"></i>
+                    Sync Google Sheets
+                </button>
+
                 <label class="cursor-pointer bg-slate-900 hover:bg-slate-800 hover:shadow-md hover:shadow-slate-200 text-white px-6 py-3 rounded-2xl transition duration-300 flex items-center gap-2 font-bold shadow-sm">
-                    <i data-lucide="upload" class="w-[18px] h-[18px]"></i>
+                    <i data-lucide="upload" class="w-[18px] h-[18px] stroke-[2.5]"></i>
                     Upload Trade CSV
                     <input type="file" accept=".csv" class="hidden" @change="handleFileUpload($event)">
                 </label>
-                <template x-if="error">
-                    <p class="text-rose-500 text-xs mt-2.5 flex items-center gap-1.5 font-semibold">
-                        <i data-lucide="alert-circle" class="w-3.5 h-3.5"></i> <span x-text="error"></span>
-                    </p>
-                </template>
             </div>
         </div>
 
-        <template x-if="data.length === 0">
+        <template x-if="error">
+            <div class="bg-rose-50 border border-rose-100 text-rose-800 p-4 rounded-2xl flex items-start gap-3 text-sm font-semibold">
+                <i data-lucide="alert-circle" class="text-rose-600 shrink-0 mt-0.5 w-5 h-5"></i>
+                <div x-text="error"></div>
+            </div>
+        </template>
+
+        <template x-show="isLoadingDefault" x-if="isLoadingDefault">
+            <div class="bg-white rounded-3xl shadow-sm p-16 flex flex-col items-center justify-center text-center border border-slate-100 min-h-[420px]">
+                <div class="animate-spin text-blue-600 mb-6">
+                    <i data-lucide="refresh-cw" class="w-12 h-12 stroke-[2]"></i>
+                </div>
+                <h2 class="text-xl font-bold text-slate-900 mb-2">Syncing with Google Sheets...</h2>
+                <p class="text-slate-400 max-w-sm text-sm">Fetching and parsing the latest credit trading records from your Google Spreadsheet.</p>
+            </div>
+        </template>
+
+        <template x-show="!isLoadingDefault && data.length === 0" x-if="!isLoadingDefault && data.length === 0">
             <div class="bg-white rounded-3xl shadow-sm p-16 flex flex-col items-center justify-center text-center border border-slate-100 min-h-[420px]">
                 <div class="bg-blue-50/80 text-blue-500 p-6 rounded-full mb-6 border border-blue-100/50 shadow-sm">
                     <i data-lucide="upload" class="w-12 h-12 stroke-[1.5]"></i>
                 </div>
                 <h2 class="text-xl font-bold text-slate-900 mb-2">No Data Available</h2>
-                <p class="text-slate-400 max-w-sm text-sm">Please upload a credit trade CSV file to populate metrics, breakdown cards, and rankings tables.</p>
+                <p class="text-slate-400 max-w-sm text-sm">Please upload a credit trade CSV file or click 'Sync Google Sheets' to populate metrics, breakdown cards, and rankings tables.</p>
             </div>
         </template>
 
-        <template x-if="data.length > 0">
+        <template x-show="!isLoadingDefault && data.length > 0" x-if="!isLoadingDefault && data.length > 0">
             <div class="space-y-8">
+                
                 <div class="bg-white p-6 rounded-3xl shadow-sm flex flex-wrap items-center justify-between gap-6 border border-slate-100">
                     <div class="flex flex-wrap items-center gap-6">
                         <span class="text-xs font-extrabold text-slate-400 uppercase tracking-widest">GLOBAL TIMELINE FILTER:</span>
@@ -92,8 +110,9 @@
 
                 <template x-if="filteredData.length > 0">
                     <div class="space-y-8">
+                        
                         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                            <div class="bg-white rounded-3xl p-6 shadow-sm flex items-center gap-5 border border-slate-100/80 transition-all duration-300 hover:shadow-md hover:shadow-slate-100">
+                            <div class="bg-white rounded-3xl p-6 shadow-sm flex items-center gap-5 border border-slate-100/80 transition-all duration-300 hover:shadow-md">
                                 <div class="p-4 rounded-2xl border shadow-sm bg-blue-50 text-blue-600 border-blue-100">
                                     <i data-lucide="trending-up" class="w-5 h-5 stroke-[2.5]"></i>
                                 </div>
@@ -104,7 +123,7 @@
                                     </h4>
                                 </div>
                             </div>
-                            <div class="bg-white rounded-3xl p-6 shadow-sm flex items-center gap-5 border border-slate-100/80 transition-all duration-300 hover:shadow-md hover:shadow-slate-100">
+                            <div class="bg-white rounded-3xl p-6 shadow-sm flex items-center gap-5 border border-slate-100/80 transition-all duration-300 hover:shadow-md">
                                 <div class="p-4 rounded-2xl border shadow-sm bg-emerald-50 text-emerald-600 border-emerald-100">
                                     <i data-lucide="package" class="w-5 h-5 stroke-[2.5]"></i>
                                 </div>
@@ -115,7 +134,7 @@
                                     </h4>
                                 </div>
                             </div>
-                            <div class="bg-white rounded-3xl p-6 shadow-sm flex items-center gap-5 border border-slate-100/80 transition-all duration-300 hover:shadow-md hover:shadow-slate-100">
+                            <div class="bg-white rounded-3xl p-6 shadow-sm flex items-center gap-5 border border-slate-100/80 transition-all duration-300 hover:shadow-md">
                                 <div class="p-4 rounded-2xl border shadow-sm bg-amber-50 text-amber-600 border-amber-100">
                                     <i data-lucide="dollar-sign" class="w-5 h-5 stroke-[2.5]"></i>
                                 </div>
@@ -124,7 +143,7 @@
                                     <h4 class="text-2xl font-extrabold text-slate-900 mt-1 tracking-tight" x-text="kpis.totalValue.toLocaleString(undefined, { maximumFractionDigits: 2 })"></h4>
                                 </div>
                             </div>
-                            <div class="bg-white rounded-3xl p-6 shadow-sm flex items-center gap-5 border border-slate-100/80 transition-all duration-300 hover:shadow-md hover:shadow-slate-100">
+                            <div class="bg-white rounded-3xl p-6 shadow-sm flex items-center gap-5 border border-slate-100/80 transition-all duration-300 hover:shadow-md">
                                 <div class="p-4 rounded-2xl border shadow-sm bg-violet-50 text-violet-600 border-violet-100">
                                     <i data-lucide="trending-up" class="w-5 h-5 stroke-[2.5]"></i>
                                 </div>
@@ -142,8 +161,8 @@
                             </div>
                             <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                                 <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100/90 flex flex-col justify-between transition-all duration-300 hover:shadow-md relative overflow-hidden group">
-                                    <div class="absolute -top-16 -left-16 w-32 h-32 rounded-full filter blur-xl opacity-20 bg-gradient-to-br from-blue-500"></div>
-                                    <div class="relative z-10">
+                                    <div class="absolute -top-16 -left-16 w-32 h-32 rounded-full filter blur-xl opacity-20 bg-blue-500"></div>
+                                    <div>
                                         <div class="flex justify-between items-start mb-2">
                                             <div>
                                                 <h4 class="text-lg font-bold text-slate-900 tracking-tight">IS-CSPO</h4>
@@ -152,7 +171,7 @@
                                             <span class="px-2.5 py-1 bg-slate-50 text-slate-500 rounded-full text-[10px] font-black font-mono tracking-wider shadow-sm border border-slate-100" x-text="(platformStats['IS-CSPO']?.totalTrades || 0) + ' TRADES'"></span>
                                         </div>
                                         <div class="h-52 relative my-2 flex justify-center">
-                                            <canvas id="cspoChart" x-init="$nextTick(() => renderDonut('cspoChart', platformStats['IS-CSPO'], ['#2563eb', '#93c5fd']))"></canvas>
+                                            <canvas id="cspoDonut"></canvas>
                                         </div>
                                         <div class="flex justify-around text-xs font-bold mt-2 border-t pt-4 border-slate-100">
                                             <div class="text-center flex flex-col items-center">
@@ -174,10 +193,9 @@
                                         </div>
                                     </div>
                                 </div>
-
                                 <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100/90 flex flex-col justify-between transition-all duration-300 hover:shadow-md relative overflow-hidden group">
-                                    <div class="absolute -top-16 -left-16 w-32 h-32 rounded-full filter blur-xl opacity-20 bg-gradient-to-br from-emerald-500"></div>
-                                    <div class="relative z-10">
+                                    <div class="absolute -top-16 -left-16 w-32 h-32 rounded-full filter blur-xl opacity-20 bg-emerald-500"></div>
+                                    <div>
                                         <div class="flex justify-between items-start mb-2">
                                             <div>
                                                 <h4 class="text-lg font-bold text-slate-900 tracking-tight">IS-CSPKO</h4>
@@ -186,7 +204,7 @@
                                             <span class="px-2.5 py-1 bg-slate-50 text-slate-500 rounded-full text-[10px] font-black font-mono tracking-wider shadow-sm border border-slate-100" x-text="(platformStats['IS-CSPKO']?.totalTrades || 0) + ' TRADES'"></span>
                                         </div>
                                         <div class="h-52 relative my-2 flex justify-center">
-                                            <canvas id="cspkoChart" x-init="$nextTick(() => renderDonut('cspkoChart', platformStats['IS-CSPKO'], ['#10b981', '#a7f3d0']))"></canvas>
+                                            <canvas id="cspkoDonut"></canvas>
                                         </div>
                                         <div class="flex justify-around text-xs font-bold mt-2 border-t pt-4 border-slate-100">
                                             <div class="text-center flex flex-col items-center">
@@ -208,10 +226,9 @@
                                         </div>
                                     </div>
                                 </div>
-
                                 <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100/90 flex flex-col justify-between transition-all duration-300 hover:shadow-md relative overflow-hidden group">
-                                    <div class="absolute -top-16 -left-16 w-32 h-32 rounded-full filter blur-xl opacity-20 bg-gradient-to-br from-amber-500"></div>
-                                    <div class="relative z-10">
+                                    <div class="absolute -top-16 -left-16 w-32 h-32 rounded-full filter blur-xl opacity-20 bg-amber-500"></div>
+                                    <div>
                                         <div class="flex justify-between items-start mb-2">
                                             <div>
                                                 <h4 class="text-lg font-bold text-slate-900 tracking-tight">IS-CSPKE</h4>
@@ -220,7 +237,7 @@
                                             <span class="px-2.5 py-1 bg-slate-50 text-slate-500 rounded-full text-[10px] font-black font-mono tracking-wider shadow-sm border border-slate-100" x-text="(platformStats['IS-CSPKE']?.totalTrades || 0) + ' TRADES'"></span>
                                         </div>
                                         <div class="h-52 relative my-2 flex justify-center">
-                                            <canvas id="cspkeChart" x-init="$nextTick(() => renderDonut('cspkeChart', platformStats['IS-CSPKE'], ['#f59e0b', '#fde68a']))"></canvas>
+                                            <canvas id="cspkeDonut"></canvas>
                                         </div>
                                         <div class="flex justify-around text-xs font-bold mt-2 border-t pt-4 border-slate-100">
                                             <div class="text-center flex flex-col items-center">
@@ -368,6 +385,7 @@
                                 </div>
                             </template>
                         </div>
+
                     </div>
                 </template>
             </div>
@@ -375,7 +393,8 @@
     </div>
 
     <script>
-        // --- Custom Helpers ---
+        const DEFAULT_SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTjKOTJPwDOz5JhzauFE7DkVRf_g0SXpkgjbD36cVH1PuxoVXW4wZiuuhIpTrZQg9CmzVNfhKdd68YE/pub?output=csv";
+
         const hashCode = (str) => {
             let hash = 0;
             for (let i = 0; i < str.length; i++) {
@@ -438,35 +457,58 @@
             return result;
         };
 
-        // --- Alpine Application Engine ---
-        function dashboardApp() {
+        function tradingApp() {
             return {
                 data: [],
                 fileName: '',
                 error: '',
+                isLoadingDefault: false,
                 selectedYear: 'All',
                 selectedMonth: 'All',
                 topListType: 'buyer',
                 selectedTopListCreditType: 'All',
                 COLORS: ['#2563eb', '#10b981', '#f59e0b', '#f43f5e', '#8b5cf6', '#06b6d4'],
-                
-                // Chart instances for management
                 charts: {},
 
                 init() {
-                    // Update Lucide vectors whenever structural shifts take place
-                    this.$watch('data', () => this.refreshDomSideEffects());
-                    this.$watch('selectedYear', () => this.refreshDomSideEffects());
-                    this.$watch('selectedMonth', () => this.refreshDomSideEffects());
-                    this.$watch('topListType', () => this.refreshDomSideEffects());
-                    this.$watch('selectedTopListCreditType', () => this.refreshDomSideEffects());
+                    // โหลดข้อมูลอัตโนมัติจาก Google Sheets ทันทีที่เปิดหน้าเว็บ
+                    this.fetchGoogleSheetsData();
+
+                    this.$watch('data', () => this.syncDashboardUI());
+                    this.$watch('selectedYear', () => this.syncDashboardUI());
+                    this.$watch('selectedMonth', () => this.syncDashboardUI());
+                    this.$watch('topListType', () => this.syncDashboardUI());
+                    this.$watch('selectedTopListCreditType', () => this.syncDashboardUI());
                 },
 
-                refreshDomSideEffects() {
+                syncDashboardUI() {
                     this.$nextTick(() => {
                         lucide.createIcons();
-                        this.renderComplexCharts();
+                        this.renderAllCharts();
                     });
+                },
+
+                async fetchGoogleSheetsData() {
+                    this.isLoadingDefault = true;
+                    this.error = '';
+                    try {
+                        const response = await fetch(DEFAULT_SHEET_URL);
+                        if (!response.ok) throw new Error('Could not retrieve data from the Google Sheets publish link.');
+                        const csvText = await response.text();
+                        const parsedData = parseCSV(csvText);
+                        if (parsedData.length === 0) throw new Error('The retrieved data is empty or formatted incorrectly.');
+                        
+                        this.data = parsedData;
+                        this.fileName = 'Google Sheets (Auto-loaded)';
+                        this.selectedYear = 'All';
+                        this.selectedMonth = 'All';
+                        this.selectedTopListCreditType = 'All';
+                    } catch (err) {
+                        console.error(err);
+                        this.error = 'Auto-load failed. Please upload your own CSV file: ' + err.message;
+                    } finally {
+                        this.isLoadingDefault = false;
+                    }
                 },
 
                 handleFileUpload(e) {
@@ -498,7 +540,6 @@
                     reader.readAsText(file);
                 },
 
-                // Getters mirroring useMemo hooks
                 get filteredData() {
                     return this.data.filter(row => {
                         const matchYear = this.selectedYear === 'All' || row.year === this.selectedYear;
@@ -521,7 +562,7 @@
                         if (creditType.includes('IS-CSPO')) key = 'IS-CSPO';
                         else if (creditType.includes('IS-CSPKO')) key = 'IS-CSPKO';
                         else if (creditType.includes('IS-CSPKE')) key = 'IS-CSPKE';
-                        
+
                         if (key) {
                             const isOff = tradeType.includes('off') || tradeType.includes('out') || tradeType.includes('direct');
                             if (isOff) {
@@ -640,13 +681,13 @@
                     return getTradingAccount(row, type);
                 },
 
-                // --- Canvas Chart Rendering Engines ---
-                renderDonut(canvasId, stats, colors) {
+                // --- เทมเพลตเรนเดอร์กราฟวงกลมขนาดเล็ก (Donut Performance Breakdown) ---
+                renderDonutCard(canvasId, key, colors) {
                     if (this.charts[canvasId]) this.charts[canvasId].destroy();
-                    
-                    const isEmpty = !stats || stats.totalQty === 0;
+                    const stats = this.platformStats[key];
                     const ctx = document.getElementById(canvasId).getContext('2d');
                     
+                    const isEmpty = !stats || stats.totalQty === 0;
                     const dataValues = isEmpty ? [1] : [stats.onQty, stats.offQty];
                     const bgColors = isEmpty ? ['#f1f5f9'] : colors;
 
@@ -661,22 +702,18 @@
                             }]
                         },
                         options: {
-                            cutout: '70%',
+                            cutout: '72%',
                             responsive: true,
                             maintainAspectRatio: false,
                             plugins: {
                                 tooltip: {
                                     enabled: !isEmpty,
-                                    callbacks: {
-                                        label: function(context) {
-                                            return ` ${context.dataset.data[context.dataIndex].toLocaleString()} credits`;
-                                        }
-                                    }
+                                    callbacks: { label: (ctx) => ` ${ctx.raw.toLocaleString()} credits` }
                                 }
                             }
                         },
                         plugins: [{
-                            id: 'centerText',
+                            id: 'centerLabel',
                             beforeDraw(chart) {
                                 const { width, height, ctx } = chart;
                                 ctx.restore();
@@ -684,31 +721,35 @@
 
                                 ctx.font = "800 9px sans-serif";
                                 ctx.fillStyle = "#94a3b8";
-                                const text1 = "TOTAL VOLUME",
-                                      text1X = Math.round((width - ctx.measureText(text1).width) / 2),
-                                      text1Y = height / 2 - 12;
-                                ctx.fillText(text1, text1X, text1Y);
+                                const t1 = "TOTAL VOLUME",
+                                      t1X = Math.round((width - ctx.measureText(t1).width) / 2);
+                                ctx.fillText(t1, t1X, (height / 2) - 12);
 
                                 ctx.font = "800 16px sans-serif";
                                 ctx.fillStyle = "#0f172a";
-                                const text2 = isEmpty ? "0" : (stats.totalQty).toLocaleString(undefined, { maximumFractionDigits: 0 }),
-                                      text2X = Math.round((width - ctx.measureText(text2).width) / 2),
-                                      text2Y = height / 2 + 6;
-                                ctx.fillText(text2, text2X, text2Y);
+                                const t2 = isEmpty ? "0" : stats.totalQty.toLocaleString(undefined, { maximumFractionDigits: 0 }),
+                                      t2X = Math.round((width - ctx.measureText(t2).width) / 2);
+                                ctx.fillText(t2, t2X, (height / 2) + 6);
                                 ctx.save();
                             }
                         }]
                     });
                 },
 
-                renderComplexCharts() {
+                // --- ฟังก์ชันหลักในการเรนเดอร์กราฟทั้งหมด (Recharts Style) ---
+                renderAllCharts() {
                     if (this.filteredData.length === 0) return;
 
-                    // 1. Credit Type Pie Chart
+                    // 1. เรนเดอร์ 3 Donut Cards หลัก ด้านบน
+                    this.renderDonutCard('cspoDonut', 'IS-CSPO', ['#2563eb', '#93c5fd']);
+                    this.renderDonutCard('cspkoDonut', 'IS-CSPKO', ['#10b981', '#a7f3d0']);
+                    this.renderDonutCard('cspkeDonut', 'IS-CSPKE', ['#f59e0b', '#fde68a']);
+
+                    // 2. Quantity Distribution by Credit Type (Pie Chart วงใหญ่ตรงกลาง)
                     if (this.charts['creditTypePieChart']) this.charts['creditTypePieChart'].destroy();
                     const pieCtx = document.getElementById('creditTypePieChart').getContext('2d');
                     const pieData = this.creditTypeData;
-                    
+
                     this.charts['creditTypePieChart'] = new Chart(pieCtx, {
                         type: 'doughnut',
                         data: {
@@ -716,48 +757,107 @@
                             datasets: [{
                                 data: pieData.map(d => d.value),
                                 backgroundColor: this.COLORS,
-                                borderWidth: 3
+                                borderWidth: 3,
+                                borderColor: '#ffffff'
                             }]
                         },
                         options: {
-                            cutout: '65%',
+                            cutout: '68%',
                             responsive: true,
                             maintainAspectRatio: false,
                             plugins: {
-                                legend: { position: 'bottom', labels: { boxWidth: 12, font: { weight: 600 } } }
+                                legend: { 
+                                    position: 'bottom', 
+                                    labels: { 
+                                        boxWidth: 8, 
+                                        usePointStyle: true, 
+                                        pointStyle: 'circle',
+                                        font: { size: 11, weight: 600 } 
+                                    } 
+                                },
+                                tooltip: {
+                                    backgroundColor: '#ffffff',
+                                    titleColor: '#0f172a',
+                                    bodyColor: '#475569',
+                                    borderColor: '#e2e8f0',
+                                    borderWidth: 1,
+                                    borderRadius: 12,
+                                    padding: 10,
+                                    callbacks: { label: (ctx) => ` ${ctx.label}: ${ctx.raw.toLocaleString()} Units` }
+                                }
                             }
-                        }
+                        },
+                        plugins: [{
+                            id: 'bigCenterLabel',
+                            beforeDraw: (chart) => {
+                                const { width, height, ctx } = chart;
+                                ctx.restore();
+                                ctx.textBaseline = "middle";
+
+                                ctx.font = "800 11px sans-serif";
+                                ctx.fillStyle = "#94a3b8";
+                                const t1 = "TOTAL UNITS",
+                                      t1X = Math.round((width - ctx.measureText(t1).width) / 2);
+                                ctx.fillText(t1, t1X, (height / 2) - 14);
+
+                                ctx.font = "800 20px sans-serif";
+                                ctx.fillStyle = "#0f172a";
+                                const t2 = this.kpis.totalQuantity.toLocaleString(undefined, { maximumFractionDigits: 0 }),
+                                      t2X = Math.round((width - ctx.measureText(t2).width) / 2);
+                                ctx.fillText(t2, t2X, (height / 2) + 10);
+                                ctx.save();
+                            }
+                        }]
                     });
 
-                    // 2. Dynamic Rank Vertical Bar Chart
+                    // 3. Dynamic Rank Horizontal Bar Chart (Top 10 แนวนอนด้านล่าง)
                     if (this.charts['topTenBarChart']) this.charts['topTenBarChart'].destroy();
                     const barCtx = document.getElementById('topTenBarChart').getContext('2d');
                     const barData = this.topListType === 'seller' ? this.topSellers : this.topBuyers;
-                    
+
                     this.charts['topTenBarChart'] = new Chart(barCtx, {
                         type: 'bar',
                         data: {
                             labels: barData.map(d => d.displayName),
                             datasets: [{
-                                label: 'Quantity',
                                 data: barData.map(d => d.quantity),
                                 backgroundColor: this.topListType === 'seller' ? '#2563eb' : '#8b5cf6',
-                                borderRadius: 6
+                                borderRadius: { topLeft: 0, topRight: 6, bottomLeft: 0, bottomRight: 6 },
+                                barPercentage: 0.45,
+                                maxBarThickness: 20
                             }]
                         },
                         options: {
-                            indexAxis: 'y',
+                            indexAxis: 'y', // เปลี่ยนเป็นแท่งแนวนอน (Horizontal Bar)
                             responsive: true,
                             maintainAspectRatio: false,
-                            plugins: { legend: { display: false } },
+                            plugins: { 
+                                legend: { display: false },
+                                tooltip: {
+                                    backgroundColor: '#0f172a',
+                                    titleColor: '#94a3b8',
+                                    bodyColor: '#ffffff',
+                                    borderRadius: 12,
+                                    padding: 10,
+                                    callbacks: { label: (ctx) => ` Quantity: ${ctx.raw.toLocaleString()}` }
+                                }
+                            },
                             scales: {
-                                x: { grid: { display: false }, ticks: { font: { size: 10 } } },
-                                y: { grid: { display: false }, ticks: { font: { size: 11, weight: 600 } } }
+                                x: { 
+                                    grid: { color: '#f1f5f9' }, 
+                                    border: { display: false },
+                                    ticks: { font: { size: 10 }, color: '#94a3b8' } 
+                                },
+                                y: { 
+                                    grid: { display: false }, 
+                                    border: { display: false },
+                                    ticks: { font: { size: 11, weight: 600 }, color: '#475569' } 
+                                }
                             }
                         }
                     });
                 }
-            }
+            };
         }
     </script>
 </body>
