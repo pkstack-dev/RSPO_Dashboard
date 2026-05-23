@@ -1,304 +1,282 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="th">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>FFB Announcements Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/lucide@latest"></script>
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
-
     <style>
-        * {
-            font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif !important;
-        }
-        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+        body { font-family: 'Inter', sans-serif; }
+        .custom-scrollbar::-webkit-scrollbar { width: 8px; height: 8px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; border: 2px solid #f1f5f9; }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
-        table { border-spacing: 0; }
-        .sticky-header th { position: sticky; top: 0; z-index: 10; background: #f8fafc; box-shadow: inset 0 -1px 0 #e2e8f0; }
-        
-        /* สไตล์อนิเมชันสำหรับปุ่มโหลดโหลดข้อมูล */
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-        .animate-spin-custom {
-            animation: spin 1s linear infinite;
-        }
+        .sticky-header th { position: sticky; top: 0; z-index: 10; background: #f1f5f9; box-shadow: inset 0 -1px 0 #cbd5e1; }
+        .hidden { display: none !important; }
     </style>
 </head>
-<body class="bg-slate-50 min-h-screen text-slate-800 antialiased" x-data="ffbDashboard()">
+<body class="bg-slate-50 min-h-screen text-slate-800">
 
-    <div class="p-4 md:p-8 max-w-full mx-auto space-y-6">
-        
-        <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-200/80">
-            <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-6 mb-6">
-                <div class="flex items-center gap-4">
-                    <div class="p-3 bg-blue-50 text-blue-600 rounded-2xl">
-                        <i data-lucide="layout-dashboard" class="w-6 h-6"></i>
-                    </div>
-                    <div>
-                        <h1 class="text-xl md:text-2xl font-extrabold text-slate-900 tracking-tight">FFB Announcements Dashboard</h1>
-                        <p class="text-xs text-slate-400 mt-0.5 font-medium flex items-center gap-1.5">
-                            <span class="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span>
-                            Automated live data stream from Google Sheets
-                        </p>
-                    </div>
+    <div id="loading-screen" class="min-h-screen flex flex-col items-center justify-center p-6">
+        <div class="max-w-md w-full bg-white rounded-3xl p-10 shadow-xl border border-slate-200 text-center space-y-4">
+            <i data-lucide="loader-2" class="animate-spin text-blue-600 mx-auto w-12 h-12"></i>
+            <h2 class="text-xl font-bold text-slate-900">Fetching Live Datasets</h2>
+            <p class="text-slate-500 text-sm">Synchronizing latest Buyer, Seller, and FFB Announcements from Google Sheets...</p>
+        </div>
+    </div>
+
+    <div id="upload-screen" class="min-h-screen flex flex-col items-center justify-center p-6 hidden">
+        <div class="max-w-xl w-full bg-white rounded-3xl shadow-xl border border-slate-200 overflow-hidden">
+            <div class="bg-blue-700 p-8 text-center text-white">
+                <div class="bg-white/20 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 backdrop-blur-sm">
+                    <i data-lucide="upload" class="w-10 h-10"></i>
                 </div>
+                <h1 class="text-2xl font-bold">FFB Data Dashboard</h1>
+                <p class="opacity-80 mt-2 text-sm uppercase tracking-wide font-medium">Automatic fetch failed or files required</p>
+            </div>
+            <div class="p-8">
+                <div class="space-y-6">
+                    <div id="error-message" class="flex items-start gap-3 bg-red-50 text-red-600 p-4 rounded-xl border border-red-100 text-xs font-semibold leading-relaxed hidden">
+                        <i data-lucide="alert-circle" class="shrink-0 w-5 h-5"></i>
+                        <p id="error-text"></p>
+                    </div>
+                    
+                    <div class="flex justify-center">
+                        <button onclick="fetchGoogleSheetsData()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg text-sm transition-colors flex items-center gap-2">
+                            <i data-lucide="refresh-cw" class="w-4 h-4"></i> Retry Auto-Fetch
+                        </button>
+                    </div>
 
-                <div class="flex items-center gap-3 self-end lg:self-auto">
-                    <button @click="loadAllData()" 
-                            :disabled="isLoading"
-                            class="p-2.5 bg-blue-50 text-blue-600 hover:bg-blue-100 disabled:opacity-50 rounded-xl transition-all border border-blue-100 flex items-center justify-center"
-                            title="Refresh Data">
-                        <i data-lucide="refresh-cw" class="w-4 h-4" :class="isLoading ? 'animate-spin-custom' : ''"></i>
-                    </button>
-                    <button @click="exportToCSV()" 
-                            :disabled="isLoading || data.length === 0"
-                            class="bg-slate-900 hover:bg-slate-800 text-white px-5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 shadow-sm transition-all disabled:opacity-50">
-                        <i data-lucide="download" class="w-3.5 h-3.5"></i> Export Data
-                    </button>
+                    <div class="relative flex py-2 items-center">
+                        <div class="flex-grow border-t border-slate-200"></div>
+                        <span class="flex-shrink mx-4 text-slate-400 text-xs font-bold uppercase">Or Manual Upload</span>
+                        <div class="flex-grow border-t border-slate-200"></div>
+                    </div>
+
+                    <div class="border-2 border-dashed border-slate-300 rounded-2xl p-10 flex flex-col items-center justify-center hover:border-blue-500 hover:bg-blue-50/50 transition-all cursor-pointer group" onclick="document.getElementById('csv-upload').click()">
+                        <input id="csv-upload" type="file" multiple accept=".csv" class="hidden" onchange="handleFileUpload(event)">
+                        <div class="p-4 bg-slate-100 rounded-full text-slate-400 group-hover:bg-blue-100 group-hover:text-blue-500 transition-colors">
+                            <i data-lucide="file-text" class="w-8 h-8"></i>
+                        </div>
+                        <p class="mt-4 font-semibold text-slate-700">Click to select files or drag and drop</p>
+                        <p class="mt-1 text-slate-400 text-sm">Supports multiple .csv files</p>
+                    </div>
                 </div>
             </div>
+        </div>
+    </div>
 
-            <template x-if="error">
-                <div class="mb-6 flex items-center gap-3 bg-red-50 text-red-600 p-4 rounded-xl border border-red-100 text-xs font-semibold">
-                    <i data-lucide="alert-circle" class="w-4 h-4 flex-shrink-0"></i>
-                    <p x-text="error"></p>
-                </div>
-            </template>
-
-            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 pt-4 border-t border-slate-100">
-                <div class="flex flex-col">
-                    <label class="text-[10px] font-extrabold text-slate-400 mb-1.5 uppercase tracking-wider">Year</label>
-                    <select class="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-700 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none cursor-pointer"
-                            x-model="selectedYear" @change="selectedMonth = 'All'">
-                        <template x-for="y in years" :key="y">
-                            <option :value="y" x-text="y"></option>
-                        </template>
-                    </select>
-                </div>
-                
-                <div class="flex flex-col">
-                    <label class="text-[10px] font-extrabold text-slate-400 mb-1.5 uppercase tracking-wider">Month</label>
-                    <select class="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-700 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none cursor-pointer"
-                            x-model="selectedMonth">
-                        <template x-for="m in monthOptions" :key="m">
-                            <option :value="m" x-text="m"></option>
-                        </template>
-                    </select>
-                </div>
-
-                <div class="flex flex-col">
-                    <label class="text-[10px] font-extrabold text-slate-400 mb-1.5 uppercase tracking-wider">Country (Global)</label>
-                    <select class="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-700 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none cursor-pointer"
-                            x-model="selectedCountry">
-                        <template x-for="c in countryOptions" :key="c">
-                            <option :value="c" x-text="c"></option>
-                        </template>
-                    </select>
-                </div>
-
-                <div class="flex flex-col lg:col-span-2">
-                    <label class="text-[10px] font-extrabold text-slate-400 mb-1.5 uppercase tracking-wider flex items-center gap-1">
-                        <i data-lucide="calendar-days" class="w-3 h-3 text-slate-400"></i> Date Range
-                    </label>
-                    <div class="flex items-center gap-2">
-                        <input type="date" class="bg-slate-50 border border-slate-200 rounded-xl px-2 py-1.5 text-xs font-semibold text-slate-600 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none w-full"
-                               x-model="dateRange.start" />
-                        <span class="text-slate-300 text-xs font-bold">to</span>
-                        <input type="date" class="bg-slate-50 border border-slate-200 rounded-xl px-2 py-1.5 text-xs font-semibold text-slate-600 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none w-full"
-                               x-model="dateRange.end" />
+    <div id="dashboard-screen" class="p-4 md:p-8 max-w-full mx-auto space-y-6 hidden">
+        
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+            <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-6 mb-6">
+                <div class="flex items-center gap-4">
+                    <button onclick="resetAllData()" class="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-400 hover:text-slate-600" title="Load/Reset Data">
+                        <i data-lucide="refresh-cw" class="w-5 h-5"></i>
+                    </button>
+                    <div>
+                        <h1 class="text-2xl font-bold text-slate-900 flex items-center gap-2">
+                            <i data-lucide="layout-dashboard" class="text-blue-600"></i>
+                            FFB Announcements Dashboard
+                        </h1>
+                        <span class="text-xs font-bold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-100 mt-1 inline-block">
+                            ● Live Data Synchronized
+                        </span>
                     </div>
                 </div>
+                <button onclick="exportToCSV()" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-xl text-sm font-bold flex items-center gap-2 shadow-lg transition-all">
+                    <i data-lucide="download" class="w-4 h-4"></i> Export CSV
+                </button>
+            </div>
 
-                <div class="flex items-end">
-                    <button class="w-full bg-slate-100 hover:bg-slate-200 text-slate-600 px-4 py-2 rounded-xl text-xs font-bold transition-all h-[36px] border border-slate-200/50"
-                            @click="resetFilters()">
-                        Reset Filters
-                    </button>
+            <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                <div class="flex flex-col">
+                    <label class="text-[10px] font-bold text-slate-400 mb-1 uppercase">Year</label>
+                    <select id="filter-year" onchange="onYearChange()" class="bg-slate-100 border-none rounded-lg px-3 py-2 text-sm font-semibold focus:ring-2 focus:ring-blue-500 outline-none"></select>
                 </div>
+                <div class="flex flex-col">
+                    <label class="text-[10px] font-bold text-slate-400 mb-1 uppercase">Month</label>
+                    <select id="filter-month" onchange="renderDashboard()" class="bg-slate-100 border-none rounded-lg px-3 py-2 text-sm font-semibold focus:ring-2 focus:ring-blue-500 outline-none"></select>
+                </div>
+                <div class="flex flex-col">
+                    <label class="text-[10px] font-bold text-slate-400 mb-1 uppercase">Country</label>
+                    <select id="filter-country" onchange="renderDashboard()" class="bg-slate-100 border-none rounded-lg px-3 py-2 text-sm font-semibold focus:ring-2 focus:ring-blue-500 outline-none"></select>
+                </div>
+                <div class="flex flex-col lg:col-span-2">
+                    <label class="text-[10px] font-bold text-slate-400 mb-1 uppercase flex items-center gap-1">
+                        <i data-lucide="calendar-days" class="w-3 h-3"></i> Date Range (Update Date)
+                    </label>
+                    <div class="flex items-center gap-2">
+                        <input type="date" id="filter-date-start" onchange="renderDashboard()" class="bg-slate-100 border-none rounded-lg px-2 py-2 text-xs font-semibold focus:ring-2 focus:ring-blue-500 outline-none w-full">
+                        <span class="text-slate-300">-</span>
+                        <input type="date" id="filter-date-end" onchange="renderDashboard()" class="bg-slate-100 border-none rounded-lg px-2 py-2 text-xs font-semibold focus:ring-2 focus:ring-blue-500 outline-none w-full">
+                    </div>
+                </div>
+                <button onclick="resetAllFilters()" class="mt-auto bg-slate-200 hover:bg-slate-300 text-slate-700 px-4 py-2 rounded-lg text-xs font-bold transition-all h-[38px]">
+                    Reset All Filters
+                </button>
             </div>
         </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div class="bg-white p-5 rounded-3xl shadow-sm border border-slate-200/70 flex items-center justify-between">
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex items-start justify-between">
                 <div>
-                    <p class="text-slate-400 text-[10px] font-extrabold uppercase tracking-wider">Total Quantity</p>
-                    <h3 class="text-2xl font-black mt-1 text-blue-600 tracking-tight" x-text="stats.totalQuantity.toLocaleString(undefined, { minimumFractionDigits: 1 })">0.0</h3>
+                    <p class="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Total Quantity</p>
+                    <h3 id="stat-total-qty" class="text-2xl font-bold mt-1 text-blue-600">0</h3>
+                    <p class="text-[10px] text-slate-500 mt-1 font-medium">Metric Tons (MT)</p>
                 </div>
-                <div class="bg-blue-50 p-3 rounded-2xl text-blue-500"><i data-lucide="trending-up" class="w-5 h-5"></i></div>
+                <div class="bg-blue-50 p-2 rounded-xl text-blue-500"><i data-lucide="trending-up" class="w-5 h-5"></i></div>
             </div>
-            <div class="bg-white p-5 rounded-3xl shadow-sm border border-slate-200/70 flex items-center justify-between">
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex items-start justify-between">
                 <div>
-                    <p class="text-slate-400 text-[10px] font-extrabold uppercase tracking-wider">Active Sellers</p>
-                    <h3 class="text-2xl font-black mt-1 text-slate-800 tracking-tight" x-text="stats.uniqueSellers.toLocaleString()">0</h3>
+                    <p class="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Active Sellers</p>
+                    <h3 id="stat-active-sellers" class="text-2xl font-bold mt-1 text-slate-800">0</h3>
+                    <p class="text-[10px] text-slate-500 mt-1 font-medium">Unique Entities</p>
                 </div>
-                <div class="bg-slate-100 p-3 rounded-2xl text-slate-500"><i data-lucide="users" class="w-5 h-5"></i></div>
+                <div class="bg-emerald-50 p-2 rounded-xl text-emerald-500"><i data-lucide="users" class="w-5 h-5"></i></div>
             </div>
-            <div class="bg-white p-5 rounded-3xl shadow-sm border border-slate-200/70 flex items-center justify-between">
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex items-start justify-between">
                 <div>
-                    <p class="text-slate-400 text-[10px] font-extrabold uppercase tracking-wider">Active Buyers</p>
-                    <h3 class="text-2xl font-black mt-1 text-slate-800 tracking-tight" x-text="stats.uniqueBuyers.toLocaleString()">0</h3>
+                    <p class="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Active Buyers</p>
+                    <h3 id="stat-active-buyers" class="text-2xl font-bold mt-1 text-slate-800">0</h3>
+                    <p class="text-[10px] text-slate-500 mt-1 font-medium">Unique Entities</p>
                 </div>
-                <div class="bg-slate-100 p-3 rounded-2xl text-slate-500"><i data-lucide="users" class="w-5 h-5"></i></div>
+                <div class="bg-amber-50 p-2 rounded-xl text-amber-500"><i data-lucide="users" class="w-5 h-5"></i></div>
             </div>
-            <div class="bg-white p-5 rounded-3xl shadow-sm border border-slate-200/70 flex items-center justify-between">
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex items-start justify-between">
                 <div>
-                    <p class="text-slate-400 text-[10px] font-extrabold uppercase tracking-wider">Geographic Reach</p>
-                    <h3 class="text-2xl font-black mt-1 text-slate-800 tracking-tight" x-text="stats.uniqueCountries.toLocaleString()">0</h3>
+                    <p class="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Geographic Reach</p>
+                    <h3 id="stat-geo-reach" class="text-2xl font-bold mt-1 text-slate-800">0</h3>
+                    <p class="text-[10px] text-slate-500 mt-1 font-medium">Country Codes</p>
                 </div>
-                <div class="bg-purple-50 p-3 rounded-2xl text-purple-500"><i data-lucide="globe" class="w-5 h-5"></i></div>
+                <div class="bg-purple-50 p-2 rounded-xl text-purple-500"><i data-lucide="globe" class="w-5 h-5"></i></div>
             </div>
         </div>
 
-        <div class="bg-white rounded-3xl shadow-sm border border-slate-200/80 overflow-hidden flex flex-col h-[680px] relative">
-            
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-[700px]">
             <div class="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-                <h2 class="font-bold text-slate-800 text-sm flex items-center gap-2">
-                    <i data-lucide="table" class="text-blue-500 w-4 h-4"></i>
-                    Transactions Registry Master
+                <h2 class="font-bold text-slate-800 flex items-center gap-2">
+                    <i data-lucide="table" class="text-blue-500 w-5 h-5"></i> Transactions Registry
                 </h2>
-                <div class="text-[10px] font-bold text-slate-500 bg-white px-3 py-1 rounded-full border border-slate-200 shadow-sm uppercase tracking-wider"
-                     x-text="filteredData.length.toLocaleString() + ' Records Found'">
+                <div id="record-count" class="text-[10px] font-bold text-slate-500 bg-white px-3 py-1 rounded-full border border-slate-200 shadow-sm uppercase">
+                    0 Records
                 </div>
             </div>
 
-            <div class="flex-1 overflow-x-auto overflow-y-auto relative custom-scrollbar" x-ref="tableScrollArea">
-                <table class="w-full text-left border-collapse min-w-[1400px]">
+            <div class="flex-1 overflow-x-auto overflow-y-auto relative custom-scrollbar">
+                <table class="w-full text-left border-collapse min-w-[1500px]">
                     <thead class="sticky-header">
                         <tr>
-                            <th class="px-4 py-3.5 text-[10px] font-extrabold text-slate-400 uppercase tracking-wider cursor-pointer hover:bg-slate-200/60 transition-colors" @click="requestSort('timestamp')">
-                                <div class="flex items-center gap-1">Update Date <span x-html="getSortIcon('timestamp')"></span></div>
+                            <th onclick="handleSort('timestamp')" class="px-4 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200 cursor-pointer hover:bg-slate-200 transition-colors">
+                                <div class="flex items-center">Update Date <span id="sort-icon-timestamp" class="ml-1"></span></div>
                             </th>
-                            <th class="px-4 py-3.5 text-[10px] font-extrabold text-slate-400 uppercase tracking-wider cursor-pointer hover:bg-slate-200/60 transition-colors" @click="requestSort('monthForTable')">
-                                <div class="flex items-center gap-1">Month <span x-html="getSortIcon('monthForTable')"></span></div>
+                            <th onclick="handleSort('monthForTable')" class="px-4 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200 cursor-pointer hover:bg-slate-200 transition-colors">
+                                <div class="flex items-center">Month <span id="sort-icon-monthForTable" class="ml-1"></span></div>
                             </th>
-                            
-                            <th class="px-4 py-3.5 text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">
+                            <th class="px-4 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200">
                                 Seller ID
-                                <div class="mt-2 flex items-center gap-1 bg-white border border-slate-200 rounded-lg px-2 py-1 font-normal shadow-inner">
+                                <div class="mt-2 flex items-center gap-1 bg-white border rounded px-2 py-0.5 font-normal">
                                     <i data-lucide="search" class="text-slate-400 w-3 h-3"></i>
-                                    <input type="text" placeholder="Filter..." class="w-full text-[11px] outline-none bg-transparent" x-model="filters.sellerId" />
+                                    <input type="text" id="col-filter-sellerId" oninput="renderDashboard()" placeholder="Filter..." class="w-full text-[10px] outline-none">
                                 </div>
                             </th>
-                            <th class="px-4 py-3.5 text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">
+                            <th class="px-4 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200">
                                 Seller Name
-                                <div class="mt-2 flex items-center gap-1 bg-white border border-slate-200 rounded-lg px-2 py-1 font-normal shadow-inner">
+                                <div class="mt-2 flex items-center gap-1 bg-white border rounded px-2 py-0.5 font-normal">
                                     <i data-lucide="search" class="text-slate-400 w-3 h-3"></i>
-                                    <input type="text" placeholder="Filter..." class="w-full text-[11px] outline-none bg-transparent" x-model="filters.sellerName" />
+                                    <input type="text" id="col-filter-sellerName" oninput="renderDashboard()" placeholder="Filter..." class="w-full text-[10px] outline-none">
                                 </div>
                             </th>
-                            <th class="px-4 py-3.5 text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">
+                            <th class="px-4 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200">
                                 Seller Country
-                                <div class="mt-2 flex items-center gap-1 bg-white border border-slate-200 rounded-lg px-2 py-1 font-normal shadow-inner">
+                                <div class="mt-2 flex items-center gap-1 bg-white border rounded px-2 py-0.5 font-normal">
                                     <i data-lucide="search" class="text-slate-400 w-3 h-3"></i>
-                                    <input type="text" placeholder="Filter..." class="w-full text-[11px] outline-none bg-transparent" x-model="filters.sellerCountry" />
+                                    <input type="text" id="col-filter-sellerCountry" oninput="renderDashboard()" placeholder="Filter..." class="w-full text-[10px] outline-none">
                                 </div>
                             </th>
-                            <th class="px-4 py-3.5 text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">
+                            <th class="px-4 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200">
                                 Buyer ID
-                                <div class="mt-2 flex items-center gap-1 bg-white border border-slate-200 rounded-lg px-2 py-1 font-normal shadow-inner">
+                                <div class="mt-2 flex items-center gap-1 bg-white border rounded px-2 py-0.5 font-normal">
                                     <i data-lucide="search" class="text-slate-400 w-3 h-3"></i>
-                                    <input type="text" placeholder="Filter..." class="w-full text-[11px] outline-none bg-transparent" x-model="filters.buyerId" />
+                                    <input type="text" id="col-filter-buyerId" oninput="renderDashboard()" placeholder="Filter..." class="w-full text-[10px] outline-none">
                                 </div>
                             </th>
-                            <th class="px-4 py-3.5 text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">
+                            <th class="px-4 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200">
                                 Buyer Name
-                                <div class="mt-2 flex items-center gap-1 bg-white border border-slate-200 rounded-lg px-2 py-1 font-normal shadow-inner">
+                                <div class="mt-2 flex items-center gap-1 bg-white border rounded px-2 py-0.5 font-normal">
                                     <i data-lucide="search" class="text-slate-400 w-3 h-3"></i>
-                                    <input type="text" placeholder="Filter..." class="w-full text-[11px] outline-none bg-transparent" x-model="filters.buyerName" />
+                                    <input type="text" id="col-filter-buyerName" oninput="renderDashboard()" placeholder="Filter..." class="w-full text-[10px] outline-none">
                                 </div>
                             </th>
-                            <th class="px-4 py-3.5 text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">
+                            <th class="px-4 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200">
                                 Buyer Country
-                                <div class="mt-2 flex items-center gap-1 bg-white border border-slate-200 rounded-lg px-2 py-1 font-normal shadow-inner">
+                                <div class="mt-2 flex items-center gap-1 bg-white border rounded px-2 py-0.5 font-normal">
                                     <i data-lucide="search" class="text-slate-400 w-3 h-3"></i>
-                                    <input type="text" placeholder="Filter..." class="w-full text-[11px] outline-none bg-transparent" x-model="filters.buyerCountry" />
+                                    <input type="text" id="col-filter-buyerCountry" oninput="renderDashboard()" placeholder="Filter..." class="w-full text-[10px] outline-none">
                                 </div>
                             </th>
-                            <th class="px-4 py-3.5 text-[10px] font-extrabold text-slate-400 uppercase tracking-wider text-right cursor-pointer hover:bg-slate-200/60 transition-colors" @click="requestSort('quantity')">
-                                <div class="flex items-center justify-end gap-1">Quantity <span x-html="getSortIcon('quantity')"></span></div>
+                            <th onclick="handleSort('quantity')" class="px-4 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200 text-right cursor-pointer hover:bg-slate-200 transition-colors">
+                                <div class="flex items-center justify-end">Quantity <span id="sort-icon-quantity" class="ml-1"></span></div>
                             </th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-slate-100 bg-white">
-                        <template x-for="row in filteredData" :key="row.id">
-                            <tr class="hover:bg-blue-50/40 transition-colors">
-                                <td class="px-4 py-3 text-xs text-slate-500 font-mono whitespace-nowrap" x-text="row.date"></td>
-                                <td class="px-4 py-3 text-xs text-slate-700 font-semibold" x-text="row.monthForTable"></td>
-                                <td class="px-4 py-3 text-xs font-bold text-slate-900" x-text="row.sellerId"></td>
-                                <td class="px-4 py-3 text-xs text-slate-600 max-w-[200px] truncate" :title="row.sellerName" x-text="row.sellerName"></td>
-                                <td class="px-4 py-3 text-xs">
-                                    <span class="px-2 py-0.5 bg-slate-100 text-slate-700 rounded-md text-[10px] font-bold border border-slate-200" x-text="row.sellerCountry"></span>
-                                </td>
-                                <td class="px-4 py-3 text-xs font-bold text-slate-900" x-text="row.buyerId"></td>
-                                <td class="px-4 py-3 text-xs text-slate-600 max-w-[200px] truncate" :title="row.buyerName" x-text="row.buyerName"></td>
-                                <td class="px-4 py-3 text-xs">
-                                    <span class="px-2 py-0.5 bg-blue-50 text-blue-700 rounded-md text-[10px] font-bold border border-blue-100" x-text="row.buyerCountry"></span>
-                                </td>
-                                <td class="px-4 py-3 text-xs font-extrabold text-slate-900 text-right" x-text="row.quantity.toLocaleString(undefined, { minimumFractionDigits: 1 })"></td>
-                            </tr>
-                        </template>
-
-                        <template x-if="filteredData.length === 0 && !isLoading">
-                            <tr>
-                                <td colSpan="9" class="px-4 py-32 text-center text-slate-400 font-medium bg-slate-50/20">
-                                    <div class="flex flex-col items-center justify-center gap-2">
-                                        <i data-lucide="alert-circle" class="w-8 h-8 text-slate-300"></i>
-                                        <p class="text-sm">No transactions match your combined metrics filter.</p>
-                                    </div>
-                                </td>
-                            </tr>
-                        </template>
-                    </tbody>
-                    
-                    <tfoot class="sticky bottom-0 z-20 bg-slate-900 text-white shadow-[0_-4px_12px_rgba(15,23,42,0.15)]">
+                    <tbody id="table-body" class="divide-y divide-slate-100">
+                        </tbody>
+                    <tfoot class="sticky bottom-0 z-20 bg-slate-900 text-white shadow-[0_-4px_10px_rgba(0,0,0,0.2)]">
                         <tr>
-                            <td colSpan="8" class="px-4 py-4 text-xs font-bold text-right uppercase tracking-[0.2em] text-slate-400">Grand Total Analysis</td>
-                            <td class="px-4 py-4 text-sm font-black text-right border-l border-white/10" x-text="grandTotal.toLocaleString(undefined, { minimumFractionDigits: 1 })">0.0</td>
+                            <td colSpan="8" class="px-4 py-4 text-xs font-black text-right uppercase tracking-[0.2em]">Grand Total Analysis</td>
+                            <td id="table-grand-total" class="px-4 py-4 text-sm font-black text-right border-l border-white/10">0.0</td>
                         </tr>
                     </tfoot>
                 </table>
             </div>
-
-            <template x-if="isLoading">
-                <div class="absolute inset-0 bg-white/70 backdrop-blur-xs flex items-center justify-center z-50 transition-all">
-                    <div class="flex flex-col items-center gap-3">
-                        <div class="w-10 h-10 border-4 border-blue-600/20 border-t-blue-600 rounded-full animate-spin-custom"></div>
-                        <p class="text-xs font-bold text-slate-500 tracking-wide uppercase">Streaming Live Stream CSV Matrix...</p>
-                    </div>
-                </div>
-            </template>
         </div>
     </div>
 
     <script>
-        // Endpoint URLs Configurations ดึงมาจากชุดโค้ดต้นฉบับ
         const SELLER_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTbvR-F2WCilDCSCd-OYXAAQYYPQxqkRAvf-2xvlU6rKJ0n1GBfn7TeJPtqpjDIsAgPNxCynwbKcHkG/pub?output=csv";
         const BUYER_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQUfIVwX0Dmu4JEcWiPQKYFRSF4bWmEl6aO59oBCkYR3oUOJlKhONVbRZC79X2HJday_dFTs5Wi8JwC/pub?output=csv";
         const FFB_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTBiGGYonVPkAZUsWooggFqoSxsL86Rt1NY5M_kxie_KmxvIuYJRP3H_8JBRrfYpLABvd27yPxOJuaa/pub?output=csv";
 
-        // คอมพิวเตอร์ช่วยถอดรหัสและประมวลผลไฟล์ CSV ป้องกันปัญหารายการที่มีเครื่องหมายจุลภาคซ้ำซ้อนในเครื่องหมายคำพูด
+        // Global Data States
+        let masterData = [];
+        let sortConfig = { key: 'timestamp', direction: 'ascending' };
+
+        // Parse CSV text respecting inner double quotes
         function parseCSV(text) {
             const lines = text.split(/\r?\n/);
-            if (lines.length === 0 || !lines[0].trim()) return [];
+            if (lines.length === 0 || !lines[0]) return [];
             
-            const result = [];
             const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+            const result = [];
             
             for (let i = 1; i < lines.length; i++) {
-                if (!lines[i].trim()) continue;
+                const line = lines[i].trim();
+                if (!line) continue;
                 
-                // Regex รองรับการสไลด์แบ่งคอลัมน์โดยไม่แยกเครื่องหมายคอมมาที่อยู่ขอบเขตของ Quotes ""
-                const matches = lines[i].match(/(".*?"|[^",]+)(?=\s*,|\s*$)|(?<=,|^)(?=,|$)/g);
-                if (matches) {
+                const matches = [];
+                let insideQuote = false;
+                let currentField = '';
+                
+                for (let j = 0; j < line.length; j++) {
+                    const char = line[j];
+                    if (char === '"') {
+                        insideQuote = !insideQuote;
+                    } else if (char === ',' && !insideQuote) {
+                        matches.push(currentField.trim().replace(/^"|"$/g, ''));
+                        currentField = '';
+                    } else {
+                        currentField += char;
+                    }
+                }
+                matches.push(currentField.trim().replace(/^"|"$/g, ''));
+                
+                if (matches.length >= headers.length) {
                     const obj = {};
                     headers.forEach((header, index) => {
-                        let value = matches[index] ? matches[index].trim().replace(/^"|"$/g, '') : '';
-                        obj[header] = value;
+                        obj[header] = matches[index] || '';
                     });
                     result.push(obj);
                 }
@@ -306,263 +284,389 @@
             return result;
         }
 
-        function ffbDashboard() {
-            return {
-                data: [],
-                isLoading: false,
-                error: null,
-                selectedYear: 'All',
-                selectedMonth: 'All',
-                selectedCountry: 'All',
-                dateRange: { start: '', end: '' },
-                sortConfig: { key: 'timestamp', direction: 'ascending' },
-                filters: {
-                    sellerId: '',
-                    sellerName: '',
-                    buyerId: '',
-                    buyerName: '',
-                    sellerCountry: '',
-                    buyerCountry: ''
-                },
+        // Parallel Fetch Live Google Sheets Data
+        async function fetchGoogleSheetsData() {
+            showScreen('loading-screen');
+            try {
+                const [resSeller, resBuyer, resFFB] = await Promise.all([
+                    fetch(SELLER_URL),
+                    fetch(BUYER_URL),
+                    fetch(FFB_URL)
+                ]);
 
-                init() {
-                    // เรียกประมวลผลข้อมูลสดทันทีเมื่อ Component เรนเดอร์บนบราวเซอร์สำเร็จ
-                    this.loadAllData();
-                },
-
-                async loadAllData() {
-                    this.isLoading = true;
-                    this.error = null;
-
-                    try {
-                        // ป้องกันการ Cache โดยต่อ Timestamp ท้าย URL Query string
-                        const cacheBust = `?t=${new Date().getTime()}`;
-                        
-                        // Fetch ข้อมูล 3 ลิงก์พร้อมกันในรูปแบบแอนซิงโครนัสพารัลเลล
-                        const [sellerRes, buyerRes, ffbRes] = await Promise.all([
-                            fetch(SELLER_URL + cacheBust),
-                            fetch(BUYER_URL + cacheBust),
-                            fetch(FFB_URL + cacheBust)
-                        ]);
-
-                        if (!sellerRes.ok || !buyerRes.ok || !ffbRes.ok) {
-                            throw new Error("Unable to establish remote connection with Google Sheets cluster endpoints.");
-                        }
-
-                        const [sellerText, buyerText, ffbText] = await Promise.all([
-                            sellerRes.text(),
-                            buyerRes.text(),
-                            ffbRes.text()
-                        ]);
-
-                        const rawSellers = parseCSV(sellerText);
-                        const rawBuyers = parseCSV(buyerText);
-                        const rawFFB = parseCSV(ffbText);
-
-                        // สร้าง HashTable เพื่อเพิ่มความเร็วในการเชื่อมโยงความสัมพันธ์ (Data Mapping Complexity O(1))
-                        const sellerMapping = {};
-                        rawSellers.forEach(row => {
-                            const keys = Object.keys(row);
-                            const idKey = keys.find(k => k.toLowerCase().includes('seller_trading_account_id')) || 'seller_trading_account_id';
-                            const countryKey = keys.find(k => k.toLowerCase().includes('seller country')) || 'seller country';
-                            if (row[idKey]) sellerMapping[row[idKey]] = row[countryKey];
-                        });
-
-                        const buyerMapping = {};
-                        rawBuyers.forEach(row => {
-                            const keys = Object.keys(row);
-                            const idKey = keys.find(k => k.toLowerCase().includes('buyer_trading_account_id')) || 'buyer_trading_account_id';
-                            const countryKey = keys.find(k => k.toLowerCase().includes('buyer country')) || 'buyer country';
-                            if (row[idKey]) buyerMapping[row[idKey]] = row[countryKey];
-                        });
-
-                        // แปลงรูปและเพิ่มคีย์ประสิทธิภาพสถิติ (Enrich Transaction Registry)
-                        const enriched = rawFFB.map((item, index) => {
-                            const itemKeys = Object.keys(item);
-                            const dateKey = itemKeys.find(k => k.toLowerCase().includes('date')) || 'Last Updated Date';
-                            const sellerIdKey = itemKeys.find(k => k.toLowerCase().includes('seller_trading_account_id')) || 'seller_trading_account_id';
-                            const sellerNameKey = itemKeys.find(k => k.toLowerCase().includes('seller name')) || 'Seller Name';
-                            const buyerIdKey = itemKeys.find(k => k.toLowerCase().includes('buyer_trading_account_id')) || 'buyer_trading_account_id';
-                            const buyerNameKey = itemKeys.find(k => k.toLowerCase().includes('buyer name')) || 'Buyer Name';
-                            const qtyKey = itemKeys.find(k => k.toLowerCase().includes('quantity')) || 'Quantity';
-
-                            const dtStr = item[dateKey] || '';
-                            const dt = new Date(dtStr);
-                            const qty = parseFloat(item[qtyKey]) || 0;
-                            
-                            let tableMonthFormat = 'Unknown';
-                            let filterMonthFormat = 'Unknown';
-                            if (!isNaN(dt.getTime())) {
-                                const mmm = dt.toLocaleString('en-US', { month: 'short' });
-                                const fullMonth = dt.toLocaleString('en-US', { month: 'long' });
-                                const yyyy = dt.getFullYear();
-                                tableMonthFormat = `${mmm}-${yyyy}`; 
-                                filterMonthFormat = fullMonth; 
-                            }
-
-                            return {
-                                id: index,
-                                date: dtStr,
-                                timestamp: !isNaN(dt.getTime()) ? dt.getTime() : 0,
-                                dateObj: !isNaN(dt.getTime()) ? dt.toISOString().split('T')[0] : null,
-                                year: !isNaN(dt.getFullYear()) ? dt.getFullYear().toString() : 'Unknown',
-                                monthForTable: tableMonthFormat,
-                                monthForFilter: filterMonthFormat,
-                                sellerId: item[sellerIdKey] || '',
-                                sellerName: item[sellerNameKey] || '',
-                                sellerCountry: sellerMapping[item[sellerIdKey]] || 'N/A',
-                                buyerId: item[buyerIdKey] || '',
-                                buyerName: item[buyerNameKey] || '',
-                                buyerCountry: buyerMapping[item[buyerIdKey]] || 'N/A',
-                                quantity: qty
-                            };
-                        });
-
-                        this.data = enriched;
-                        this.$nextTick(() => lucide.createIcons());
-                    } catch (err) {
-                        this.error = err.message;
-                    } finally {
-                        this.isLoading = false;
-                    }
-                },
-
-                // ใช้กลไก Getters สำหรับประมวลผล Reactive Derived State
-                get years() {
-                    const uniqueYears = [...new Set(this.data.map(d => d.year))];
-                    return ['All', ...uniqueYears].sort();
-                },
-
-                get monthOptions() {
-                    let filteredForMonths = this.data;
-                    if (this.selectedYear !== 'All') {
-                        filteredForMonths = this.data.filter(d => d.year === this.selectedYear);
-                    }
-                    const uniqueMonths = [...new Set(filteredForMonths.map(d => d.monthForFilter))];
-                    const monthsOrder = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-                    
-                    return ['All', ...uniqueMonths].sort((a, b) => {
-                        if (a === 'All') return -1;
-                        if (b === 'All') return 1;
-                        return monthsOrder.indexOf(a) - monthsOrder.indexOf(b);
-                    });
-                },
-
-                get countryOptions() {
-                    const allCountries = new Set();
-                    this.data.forEach(d => {
-                        if (d.sellerCountry !== 'N/A') allCountries.add(d.sellerCountry);
-                        if (d.buyerCountry !== 'N/A') allCountries.add(d.buyerCountry);
-                    });
-                    return ['All', ...Array.from(allCountries)].sort();
-                },
-
-                get filteredData() {
-                    let processed = this.data.filter(item => {
-                        const matchYear = this.selectedYear === 'All' || item.year === this.selectedYear;
-                        const matchMonth = this.selectedMonth === 'All' || item.monthForFilter === this.selectedMonth;
-                        const matchCountry = this.selectedCountry === 'All' || item.sellerCountry === this.selectedCountry || item.buyerCountry === this.selectedCountry;
-                        
-                        const dateVal = item.dateObj;
-                        const matchDateRange = (!this.dateRange.start || dateVal >= this.dateRange.start) && 
-                                               (!this.dateRange.end || dateVal <= this.dateRange.end);
-
-                        const matchSellerId = item.sellerId.toLowerCase().includes(this.filters.sellerId.toLowerCase());
-                        const matchSellerName = item.sellerName.toLowerCase().includes(this.filters.sellerName.toLowerCase());
-                        const matchBuyerId = item.buyerId.toLowerCase().includes(this.filters.buyerId.toLowerCase());
-                        const matchBuyerName = item.buyerName.toLowerCase().includes(this.filters.buyerName.toLowerCase());
-                        const matchSellerCountryCol = item.sellerCountry.toLowerCase().includes(this.filters.sellerCountry.toLowerCase());
-                        const matchBuyerCountryCol = item.buyerCountry.toLowerCase().includes(this.filters.buyerCountry.toLowerCase());
-
-                        return matchYear && matchMonth && matchCountry && matchDateRange &&
-                               matchSellerId && matchSellerName && matchBuyerId && matchBuyerName && 
-                               matchSellerCountryCol && matchBuyerCountryCol;
-                    });
-
-                    // ดำเนินการเรียงลำดับข้อมูลเชิงลึก (Sorting Engine)
-                    processed.sort((a, b) => {
-                        let valA = a[this.sortConfig.key];
-                        let valB = b[this.sortConfig.key];
-                        
-                        if (this.sortConfig.key === 'monthForTable') {
-                            valA = a.timestamp;
-                            valB = b.timestamp;
-                        }
-
-                        if (valA < valB) return this.sortConfig.direction === 'ascending' ? -1 : 1;
-                        if (valA > valB) return this.sortConfig.direction === 'ascending' ? 1 : -1;
-                        return 0;
-                    });
-
-                    return processed;
-                },
-
-                get stats() {
-                    const totalQuantity = this.filteredData.reduce((sum, item) => sum + item.quantity, 0);
-                    const uniqueSellers = new Set(this.filteredData.map(item => item.sellerId)).size;
-                    const uniqueBuyers = new Set(this.filteredData.map(item => item.buyerId)).size;
-                    const uniqueCountries = new Set([...this.filteredData.map(item => item.sellerCountry), ...this.filteredData.map(item => item.buyerCountry)]).size;
-                    return { totalQuantity, uniqueSellers, uniqueBuyers, uniqueCountries };
-                },
-
-                get grandTotal() {
-                    return this.filteredData.reduce((sum, item) => sum + item.quantity, 0);
-                },
-
-                requestSort(key) {
-                    let direction = 'ascending';
-                    if (this.sortConfig.key === key && this.sortConfig.direction === 'ascending') {
-                        direction = 'descending';
-                    }
-                    this.sortConfig = { key, direction };
-                },
-
-                getSortIcon(key) {
-                    if (this.sortConfig.key !== key) {
-                        return `<span class="inline-block ml-0.5 text-slate-300">↕</span>`;
-                    }
-                    return this.sortConfig.direction === 'ascending' ? 
-                        `<span class="inline-block ml-0.5 text-blue-600 font-black">↑</span>` : 
-                        `<span class="inline-block ml-0.5 text-blue-600 font-black">↓</span>`;
-                },
-
-                exportToCSV() {
-                    if (this.filteredData.length === 0) return;
-                    const headers = ["Last Updated Date", "Month", "Seller ID", "Seller Name", "Seller Country", "Buyer ID", "Buyer Name", "Buyer Country", "Quantity"];
-                    const csvRows = [headers.join(",")];
-                    
-                    this.filteredData.forEach(row => {
-                        const values = [
-                            `"${row.date}"`, 
-                            `"${row.monthForTable}"`, 
-                            `"${row.sellerId}"`, 
-                            `"${row.sellerName.replace(/"/g, '""')}"`, 
-                            `"${row.sellerCountry}"`, 
-                            `"${row.buyerId}"`, 
-                            `"${row.buyerName.replace(/"/g, '""')}"`, 
-                            `"${row.buyerCountry}"`, 
-                            row.quantity
-                        ];
-                        csvRows.push(values.join(","));
-                    });
-                    
-                    const blob = new Blob([csvRows.join("\n")], { type: 'text/csv;charset=utf-8;' });
-                    const url = URL.createObjectURL(blob);
-                    const link = document.createElement("a");
-                    link.href = url;
-                    link.download = `FFB_Registry_Export_${new Date().toISOString().split('T')[0]}.csv`;
-                    link.click();
-                },
-
-                resetFilters() {
-                    this.selectedYear = 'All';
-                    this.selectedMonth = 'All';
-                    this.selectedCountry = 'All';
-                    this.dateRange = { start: '', end: '' };
-                    this.filters = { sellerId: '', sellerName: '', buyerId: '', buyerName: '', sellerCountry: '', buyerCountry: '' };
+                if (!resSeller.ok || !resBuyer.ok || !resFFB.ok) {
+                    throw new Error("Failed to fetch data from Google Sheets.");
                 }
+
+                const textSeller = await resSeller.text();
+                const textBuyer = await resBuyer.text();
+                const textFFB = await resFFB.text();
+
+                const parsedSeller = parseCSV(textSeller);
+                const parsedBuyer = parseCSV(textBuyer);
+                const parsedFFB = parseCSV(textFFB);
+
+                processCombinedData(parsedFFB, parsedSeller, parsedBuyer);
+            } catch (err) {
+                console.error(err);
+                document.getElementById('error-text').innerText = "Error auto-fetching Google Sheets: " + err.message + ". You can try manually uploading the CSV files below.";
+                document.getElementById('error-message').classList.remove('hidden');
+                showScreen('upload-screen');
             }
         }
+
+        // Manual upload logic
+        async function handleFileUpload(event) {
+            const files = Array.from(event.target.files);
+            if (files.length === 0) return;
+
+            showScreen('loading-screen');
+            let mainData = [];
+            let sellerRows = [];
+            let buyerRows = [];
+
+            try {
+                for (const file of files) {
+                    const text = await file.text();
+                    const parsed = parseCSV(text);
+                    if (parsed.length === 0) continue;
+
+                    const firstRow = parsed[0];
+                    const hasQuantity = Object.keys(firstRow).some(k => k.toLowerCase() === 'quantity');
+                    const hasDate = Object.keys(firstRow).some(k => k.toLowerCase().includes('date'));
+                    const hasSellerCountry = Object.keys(firstRow).some(k => k.toLowerCase().includes('seller country'));
+                    const hasBuyerCountry = Object.keys(firstRow).some(k => k.toLowerCase().includes('buyer country'));
+
+                    if (hasQuantity && hasDate) {
+                        mainData = parsed;
+                    } else if (hasSellerCountry) {
+                        sellerRows = parsed;
+                    } else if (hasBuyerCountry) {
+                        buyerRows = parsed;
+                    }
+                }
+
+                if (mainData.length === 0) {
+                    throw new Error("No main data file found. Ensure your uploaded files contain Quantity and Date.");
+                }
+
+                processCombinedData(mainData, sellerRows, buyerRows);
+            } catch (err) {
+                alert(err.message);
+                showScreen('upload-screen');
+            }
+        }
+
+        // Process, map and merge dataset fields
+        function processCombinedData(mainData, sellerRows, buyerRows) {
+            try {
+                let sellerMapping = {};
+                let buyerMapping = {};
+
+                sellerRows.forEach(row => {
+                    const idKey = Object.keys(row).find(k => k.toLowerCase().includes('seller_trading_account_id')) || 'seller_trading_account_id';
+                    const countryKey = Object.keys(row).find(k => k.toLowerCase().includes('seller country')) || 'seller country';
+                    if (row[idKey]) sellerMapping[row[idKey]] = row[countryKey];
+                });
+
+                buyerRows.forEach(row => {
+                    const idKey = Object.keys(row).find(k => k.toLowerCase().includes('buyer_trading_account_id')) || 'buyer_trading_account_id';
+                    const countryKey = Object.keys(row).find(k => k.toLowerCase().includes('buyer country')) || 'buyer country';
+                    if (row[idKey]) buyerMapping[row[idKey]] = row[countryKey];
+                });
+
+                masterData = mainData.map((item, index) => {
+                    const dateKey = Object.keys(item).find(k => k.toLowerCase().includes('date')) || 'Last Updated Date';
+                    const sellerIdKey = Object.keys(item).find(k => k.toLowerCase().includes('seller_trading_account_id')) || 'seller_trading_account_id';
+                    const sellerNameKey = Object.keys(item).find(k => k.toLowerCase().includes('seller name')) || 'Seller Name';
+                    const buyerIdKey = Object.keys(item).find(k => k.toLowerCase().includes('buyer_trading_account_id')) || 'buyer_trading_account_id';
+                    const buyerNameKey = Object.keys(item).find(k => k.toLowerCase().includes('buyer name')) || 'Buyer Name';
+                    const qtyKey = Object.keys(item).find(k => k.toLowerCase().includes('quantity')) || 'Quantity';
+
+                    const dtStr = item[dateKey] || '';
+                    const dt = new Date(dtStr);
+                    const qty = parseFloat(item[qtyKey]) || 0;
+                    
+                    let tableMonthFormat = 'Unknown';
+                    let filterMonthFormat = 'Unknown';
+                    if (!isNaN(dt.getTime())) {
+                        const mmm = dt.toLocaleString('en-US', { month: 'short' });
+                        const fullMonth = dt.toLocaleString('en-US', { month: 'long' });
+                        const yyyy = dt.getFullYear();
+                        tableMonthFormat = `${mmm}-${yyyy}`;
+                        filterMonthFormat = fullMonth;
+                    }
+
+                    return {
+                        id: index,
+                        date: dtStr,
+                        timestamp: !isNaN(dt.getTime()) ? dt.getTime() : 0,
+                        dateObj: !isNaN(dt.getTime()) ? dt.toISOString().split('T')[0] : null,
+                        year: !isNaN(dt.getFullYear()) ? dt.getFullYear().toString() : 'Unknown',
+                        monthForTable: tableMonthFormat,
+                        monthForFilter: filterMonthFormat,
+                        sellerId: item[sellerIdKey] || '',
+                        sellerName: item[sellerNameKey] || '',
+                        sellerCountry: sellerMapping[item[sellerIdKey]] || 'N/A',
+                        buyerId: item[buyerIdKey] || '',
+                        buyerName: item[buyerNameKey] || '',
+                        buyerCountry: buyerMapping[item[buyerIdKey]] || 'N/A',
+                        quantity: qty
+                    };
+                });
+
+                initializeFilters();
+                renderDashboard();
+                showScreen('dashboard-screen');
+            } catch (err) {
+                alert("Error parsing and processing table datasets: " + err.message);
+                showScreen('upload-screen');
+            }
+        }
+
+        // Initialize Filter Dropdowns options Dynamically
+        function initializeFilters() {
+            const years = ['All', ...new Set(masterData.map(d => d.year))].sort();
+            const yearSelect = document.getElementById('filter-year');
+            yearSelect.innerHTML = years.map(y => `<option value="${y}">${y}</option>`).join('');
+
+            const allCountries = new Set();
+            masterData.forEach(d => {
+                if (d.sellerCountry !== 'N/A' && d.sellerCountry.trim()) allCountries.add(d.sellerCountry.trim());
+                if (d.buyerCountry !== 'N/A' && d.buyerCountry.trim()) allCountries.add(d.buyerCountry.trim());
+            });
+            const countries = ['All', ...Array.from(allCountries)].sort();
+            document.getElementById('filter-country').innerHTML = countries.map(c => `<option value="${c}">${c}</option>`).join('');
+
+            updateMonthOptions();
+        }
+
+        function updateMonthOptions() {
+            const selectedYear = document.getElementById('filter-year').value;
+            let filteredForMonths = masterData;
+            if (selectedYear !== 'All') {
+                filteredForMonths = masterData.filter(d => d.year === selectedYear);
+            }
+            const uniqueMonths = [...new Set(filteredForMonths.map(d => d.monthForFilter))];
+            const monthsOrder = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+            
+            const sortedMonths = ['All', ...uniqueMonths].sort((a, b) => {
+                if (a === 'All') return -1;
+                return monthsOrder.indexOf(a) - monthsOrder.indexOf(b);
+            });
+
+            document.getElementById('filter-month').innerHTML = sortedMonths.map(m => `<option value="${m}">${m}</option>`).join('');
+        }
+
+        function onYearChange() {
+            updateMonthOptions();
+            renderDashboard();
+        }
+
+        // Get Filtered and Sorted Array
+        function getFilteredAndSortedData() {
+            const yearVal = document.getElementById('filter-year').value;
+            const monthVal = document.getElementById('filter-month').value;
+            const countryVal = document.getElementById('filter-country').value;
+            const dateStart = document.getElementById('filter-date-start').value;
+            const dateEnd = document.getElementById('filter-date-end').value;
+
+            // Column Filters
+            const fSellerId = document.getElementById('col-filter-sellerId').value.toLowerCase();
+            const fSellerName = document.getElementById('col-filter-sellerName').value.toLowerCase();
+            const fSellerCountry = document.getElementById('col-filter-sellerCountry').value.toLowerCase();
+            const fBuyerId = document.getElementById('col-filter-buyerId').value.toLowerCase();
+            const fBuyerName = document.getElementById('col-filter-buyerName').value.toLowerCase();
+            const fBuyerCountry = document.getElementById('col-filter-buyerCountry').value.toLowerCase();
+
+            let processed = masterData.filter(item => {
+                const matchYear = yearVal === 'All' || item.year === yearVal;
+                const matchMonth = monthVal === 'All' || item.monthForFilter === monthVal;
+                const matchCountry = countryVal === 'All' || item.sellerCountry === countryVal || item.buyerCountry === countryVal;
+                
+                const dateVal = item.dateObj;
+                const matchDateRange = (!dateStart || dateVal >= dateStart) && (!dateEnd || dateVal <= dateEnd);
+
+                const matchSellerId = item.sellerId.toLowerCase().includes(fSellerId);
+                const matchSellerName = item.sellerName.toLowerCase().includes(fSellerName);
+                const matchSellerCountryCol = item.sellerCountry.toLowerCase().includes(fSellerCountry);
+                const matchBuyerId = item.buyerId.toLowerCase().includes(fBuyerId);
+                const matchBuyerName = item.buyerName.toLowerCase().includes(fBuyerName);
+                const matchBuyerCountryCol = item.buyerCountry.toLowerCase().includes(fBuyerCountry);
+
+                return matchYear && matchMonth && matchCountry && matchDateRange &&
+                       matchSellerId && matchSellerName && matchSellerCountryCol && 
+                       matchBuyerId && matchBuyerName && matchBuyerCountryCol;
+            });
+
+            // Sort logic
+            processed.sort((a, b) => {
+                let valA = a[sortConfig.key];
+                let valB = b[sortConfig.key];
+                
+                if (sortConfig.key === 'monthForTable') {
+                    valA = a.timestamp;
+                    valB = b.timestamp;
+                }
+
+                if (valA < valB) return sortConfig.direction === 'ascending' ? -1 : 1;
+                if (valA > valB) return sortConfig.direction === 'ascending' ? 1 : -1;
+                return 0;
+            });
+
+            return processed;
+        }
+
+        // Render Data Table, Summary Stats, Counters
+        function renderDashboard() {
+            const data = getFilteredAndSortedData();
+
+            // 1. Calculate Stats
+            let totalQuantity = 0;
+            let uniqueSellers = new Set();
+            let uniqueBuyers = new Set();
+            let uniqueCountries = new Set();
+
+            data.forEach(item => {
+                totalQuantity += item.quantity;
+                if(item.sellerId) uniqueSellers.add(item.sellerId);
+                if(item.buyerId) uniqueBuyers.add(item.buyerId);
+                if(item.sellerCountry && item.sellerCountry !== 'N/A') uniqueCountries.add(item.sellerCountry);
+                if(item.buyerCountry && item.buyerCountry !== 'N/A') uniqueCountries.add(item.buyerCountry);
+            });
+
+            // Update stats layout
+            document.getElementById('stat-total-qty').innerText = totalQuantity.toLocaleString(undefined, { minimumFractionDigits: 1 });
+            document.getElementById('stat-active-sellers').innerText = uniqueSellers.size.toLocaleString();
+            document.getElementById('stat-active-buyers').innerText = uniqueBuyers.size.toLocaleString();
+            document.getElementById('stat-geo-reach').innerText = uniqueCountries.size.toLocaleString();
+            document.getElementById('record-count').innerText = `${data.length.toLocaleString()} Records`;
+            document.getElementById('table-grand-total').innerText = totalQuantity.toLocaleString(undefined, { minimumFractionDigits: 1 });
+
+            // 2. Render Table Rows
+            const tbody = document.getElementById('table-body');
+            if (data.length > 0) {
+                tbody.innerHTML = data.map(row => `
+                    <tr class="hover:bg-slate-50 transition-colors">
+                        <td class="px-4 py-3 text-xs text-slate-600 font-mono whitespace-nowrap">${row.date}</td>
+                        <td class="px-4 py-3 text-xs text-slate-600 font-bold">${row.monthForTable}</td>
+                        <td class="px-4 py-3 text-xs font-bold text-slate-800">${row.sellerId}</td>
+                        <td class="px-4 py-3 text-xs text-slate-600 max-w-xs truncate" title="${row.sellerName}">${row.sellerName}</td>
+                        <td class="px-4 py-3 text-xs">
+                            <span class="px-2 py-0.5 bg-slate-100 text-slate-700 rounded-md text-[10px] font-bold border border-slate-200">${row.sellerCountry}</span>
+                        </td>
+                        <td class="px-4 py-3 text-xs font-bold text-slate-800">${row.buyerId}</td>
+                        <td class="px-4 py-3 text-xs text-slate-600 max-w-xs truncate" title="${row.buyerName}">${row.buyerName}</td>
+                        <td class="px-4 py-3 text-xs">
+                            <span class="px-2 py-0.5 bg-blue-50 text-blue-700 rounded-md text-[10px] font-bold border border-blue-100">${row.buyerCountry}</span>
+                        </td>
+                        <td class="px-4 py-3 text-xs font-black text-slate-900 text-right">
+                            ${row.quantity.toLocaleString(undefined, { minimumFractionDigits: 1 })}
+                        </td>
+                    </tr>
+                `).join('');
+            } else {
+                tbody.innerHTML = `<tr><td colSpan="9" class="px-4 py-32 text-center text-slate-400 font-medium bg-slate-50/30">No transactions match your combined filters.</td></tr>`;
+            }
+
+            updateSortIcons();
+        }
+
+        // Handling Sorting Event
+        function handleSort(key) {
+            if (sortConfig.key === key) {
+                sortConfig.direction = sortConfig.direction === 'ascending' ? 'descending' : 'ascending';
+            } else {
+                sortConfig.key = key;
+                sortConfig.direction = 'ascending';
+            }
+            renderDashboard();
+        }
+
+        // Dynamic Sorting Icons Engine
+        function updateSortIcons() {
+            const keys = ['timestamp', 'monthForTable', 'quantity'];
+            keys.forEach(k => {
+                const el = document.getElementById(`sort-icon-${k}`);
+                if (!el) return;
+                if (sortConfig.key !== k) {
+                    el.innerHTML = `<i data-lucide="arrow-up-down" class="inline w-3 h-3 text-slate-300"></i>`;
+                } else {
+                    el.innerHTML = sortConfig.direction === 'ascending' 
+                        ? `<i data-lucide="arrow-up" class="inline w-3 h-3 text-blue-500"></i>` 
+                        : `<i data-lucide="arrow-down" class="inline w-3 h-3 text-blue-500"></i>`;
+                }
+            });
+            lucide.createIcons(); // Refresh dynamic icons
+        }
+
+        // Export data to CSV File download
+        function exportToCSV() {
+            const filteredData = getFilteredAndSortedData();
+            if (filteredData.length === 0) return;
+            const headers = ["Last Updated Date", "Month", "Seller ID", "Seller Name", "Seller Country", "Buyer ID", "Buyer Name", "Buyer Country", "Quantity"];
+            const csvRows = [headers.join(",")];
+            
+            filteredData.forEach(row => {
+                const values = [
+                    `"${row.date}"`, 
+                    `"${row.monthForTable}"`, 
+                    `"${row.sellerId}"`, 
+                    `"${row.sellerName.replace(/"/g, '""')}"`, 
+                    `"${row.sellerCountry}"`, 
+                    `"${row.buyerId}"`, 
+                    `"${row.buyerName.replace(/"/g, '""')}"`, 
+                    `"${row.buyerCountry}"`, 
+                    row.quantity
+                ];
+                csvRows.push(values.join(","));
+            });
+            const blob = new Blob([csvRows.join("\n")], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = `FFB_Export_${new Date().toISOString().split('T')[0]}.csv`;
+            link.click();
+        }
+
+        // Reset Filter layout values
+        function resetAllFilters() {
+            document.getElementById('filter-year').value = 'All';
+            updateMonthOptions();
+            document.getElementById('filter-month').value = 'All';
+            document.getElementById('filter-country').value = 'All';
+            document.getElementById('filter-date-start').value = '';
+            document.getElementById('filter-date-end').value = '';
+
+            document.getElementById('col-filter-sellerId').value = '';
+            document.getElementById('col-filter-sellerName').value = '';
+            document.getElementById('col-filter-sellerCountry').value = '';
+            document.getElementById('col-filter-buyerId').value = '';
+            document.getElementById('col-filter-buyerName').value = '';
+            document.getElementById('col-filter-buyerCountry').value = '';
+
+            renderDashboard();
+        }
+
+        function resetAllData() {
+            masterData = [];
+            document.getElementById('error-message').classList.add('hidden');
+            fetchGoogleSheetsData();
+        }
+
+        // Screen State Utility
+        function showScreen(screenId) {
+            document.getElementById('loading-screen').classList.add('hidden');
+            document.getElementById('upload-screen').classList.add('hidden');
+            document.getElementById('dashboard-screen').classList.add('hidden');
+            document.getElementById(screenId).classList.remove('hidden');
+            lucide.createIcons();
+        }
+
+        // Initial Trigger
+        window.onload = function() {
+            fetchGoogleSheetsData();
+        };
     </script>
 </body>
 </html>
