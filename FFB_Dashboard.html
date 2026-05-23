@@ -310,7 +310,6 @@
             } catch (err) {
                 console.error(err);
                 document.getElementById('error-text').innerText = "Error auto-fetching Google Sheets: " + err.message + ". You can try manually uploading the CSV files below.";
-                document.getElementById('error-message').classList.remove('hidden');
                 showScreen('upload-screen');
             }
         }
@@ -426,17 +425,24 @@
 
         // Initialize Filter Dropdowns options Dynamically
         function initializeFilters() {
-            const years = ['All', ...new Set(masterData.map(d => d.year))].sort();
+            // ปรับแก้จุดที่ 1: จัดเรียงปีให้ตัวเลขอยู่หลัง 'All' เพื่อให้ 'All' อยู่บนสุดและเสถียร
+            const rawYears = [...new Set(masterData.map(d => d.year))].sort();
+            const years = ['All', ...rawYears];
             const yearSelect = document.getElementById('filter-year');
             yearSelect.innerHTML = years.map(y => `<option value="${y}">${y}</option>`).join('');
+            yearSelect.value = 'All'; // บังคับให้เลือก All เป็นค่าเริ่มต้น
 
             const allCountries = new Set();
             masterData.forEach(d => {
                 if (d.sellerCountry !== 'N/A' && d.sellerCountry.trim()) allCountries.add(d.sellerCountry.trim());
                 if (d.buyerCountry !== 'N/A' && d.buyerCountry.trim()) allCountries.add(d.buyerCountry.trim());
             });
-            const countries = ['All', ...Array.from(allCountries)].sort();
-            document.getElementById('filter-country').innerHTML = countries.map(c => `<option value="${c}">${c}</option>`).join('');
+            const rawCountries = Array.from(allCountries).sort();
+            const countries = ['All', ...rawCountries];
+            
+            const countrySelect = document.getElementById('filter-country');
+            countrySelect.innerHTML = countries.map(c => `<option value="${c}">${c}</option>`).join('');
+            countrySelect.value = 'All'; // บังคับให้เลือก All เป็นค่าเริ่มต้น
 
             updateMonthOptions();
         }
@@ -450,12 +456,12 @@
             const uniqueMonths = [...new Set(filteredForMonths.map(d => d.monthForFilter))];
             const monthsOrder = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
             
-            const sortedMonths = ['All', ...uniqueMonths].sort((a, b) => {
-                if (a === 'All') return -1;
-                return monthsOrder.indexOf(a) - monthsOrder.indexOf(b);
-            });
+            // ปรับแก้จุดที่ 2: ให้ 'All' นำหน้าและเลือกเป็นค่าเริ่มต้นเสมอเมื่อฟังก์ชันนี้ทำงาน
+            const sortedMonths = ['All', ...uniqueMonths.sort((a, b) => monthsOrder.indexOf(a) - monthsOrder.indexOf(b))];
 
-            document.getElementById('filter-month').innerHTML = sortedMonths.map(m => `<option value="${m}">${m}</option>`).join('');
+            const monthSelect = document.getElementById('filter-month');
+            monthSelect.innerHTML = sortedMonths.map(m => `<option value="${m}">${m}</option>`).join('');
+            monthSelect.value = 'All'; // บังคับให้เลือก All เป็นค่าเริ่มต้น
         }
 
         function onYearChange() {
@@ -650,7 +656,6 @@
 
         function resetAllData() {
             masterData = [];
-            document.getElementById('error-message').classList.add('hidden');
             fetchGoogleSheetsData();
         }
 
